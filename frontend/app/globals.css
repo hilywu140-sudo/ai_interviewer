@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Global ─── */
+html {
+  scroll-behavior: smooth;
+}
+
+::selection {
+  background: #F0E6CC;
+  color: #1A1A1A;
+}
+
+/* ─── Custom scrollbar (thin, warm) ─── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #D4CFC4;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8B6914;
+}
+
+/* ─── Prose warm (for AI chat messages) ─── */
+.prose-warm {
+  --tw-prose-body: #4A4A4A;
+  --tw-prose-headings: #1A1A1A;
+  --tw-prose-lead: #6B6B6B;
+  --tw-prose-links: #8B6914;
+  --tw-prose-bold: #1A1A1A;
+  --tw-prose-counters: #6B6B6B;
+  --tw-prose-bullets: #D4CFC4;
+  --tw-prose-hr: #E8E5DE;
+  --tw-prose-quotes: #333333;
+  --tw-prose-quote-borders: #D4B96A;
+  --tw-prose-code: #1A1A1A;
+  --tw-prose-pre-code: #F5F3ED;
+  --tw-prose-pre-bg: #1A1A1A;
+  --tw-prose-th-borders: #E8E5DE;
+  --tw-prose-td-borders: #F5F3ED;
+}
+
+/* ─── Prose heading & paragraph spacing ─── */
+.prose.prose-sm h2 {
+  @apply text-lg font-bold mt-5 mb-3;
+}
+
+.prose.prose-sm h3 {
+  @apply text-base font-semibold mt-4 mb-2;
+}
+
+.prose.prose-sm h4 {
+  @apply text-sm font-semibold mt-3 mb-2;
+}
+
+.prose.prose-sm ul {
+  @apply my-3 ml-4;
+}
+
+.prose.prose-sm ol {
+  @apply my-3 ml-4;
+}
+
+.prose.prose-sm li {
+  @apply my-1.5;
+}
+
+.prose.prose-sm p {
+  @apply my-3 leading-relaxed;
+}
+
+.prose.prose-sm blockquote {
+  @apply my-4 pl-4 border-l-4 border-warm-200 italic text-ink-100;
+}
+
+.prose.prose-sm hr {
+  @apply my-5 border-cream-300;
+}
+
+/* ─── Input focus ring override ─── */
+input:focus,
+textarea:focus {
+  outline: none;
+}
+
+/* ─── Warm bounce animation for status dots ─── */
+@keyframes warm-bounce {
+  0%, 80%, 100% {
+    transform: scale(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-warm-bounce {
+  animation: warm-bounce 1.4s infinite ease-in-out both;
+}
+
+.animate-warm-bounce-delay-1 {
+  animation-delay: 0.16s;
+}
+
+.animate-warm-bounce-delay-2 {
+  animation-delay: 0.32s;
+}

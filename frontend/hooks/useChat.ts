@@ -1,0 +1,671 @@
+'use client'
+
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  ChatMessage,
+  ChatState,
+  ServerMessage,
+  AgentStatus,
+  CurrentAgent,
+  RecordingState,
+  TranscriptionState,
+  PracticeFeedback,
+  TranscriptSentence,
+  Message,
+  Session,
+  MessageContext
+} from '@/lib/types'
+import { messagesApi, audioApi, sessionsApi, assetsApi } from '@/lib/api-client'
+import { getToken } from '@/lib/auth-api'
+
+interface UseChatReturn {
+  state: ChatState & {
+    isLoadingHistory: boolean
+    hasMoreHistory: boolean
+    isSubmitted: boolean  // 是否已提交等待分析
+    isStreaming: boolean  // 是否正在流式输出
+    streamingContent: string  // 流式输出内容
+    projectId: string | null  // 项目ID
+    pendingQuery: string  // 待处理的用户输入（用于取消后恢复）
+    messageContext: MessageContext | null  // 消息上下文（用于逐字稿修改）
+    newAssetId: string | null  // 新保存的 Asset ID（用于侧边栏高亮）
+  }
+  sendMessage: (content: string, context?: MessageContext) => void
+  setMessageContext: (context: MessageContext | null) => void
+  submitAudio: (audioData: string) => void
+  startRecording: () => void
+  stopRecording: () => void
+  cancelRecording: () => void
+  cancelGeneration: () => string  // 取消生成，返回待恢复的query
+  loadMoreHistory: () => Promise<void>
+  clearNewAssetId: () => void  // 清除新 Asset 高亮
+  confirmSave: (messageId: string) => Promise<void>  // 确认保存（按消息ID）
+}
+
+const initialRecordingState: RecordingState = {
+  isActive: false,
+  isRecording: false,
+  question: null,
+  duration: 0
+}
+
+const initialTranscriptionState: TranscriptionState = {
+  text: null,
+  isFinal: false
+}
+
+export function useChat(sessionId: string): UseChatReturn {
+  const [isConnected, setIsConnected] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>('idle')
+  const [currentAgent, setCurrentAgent] = useState<CurrentAgent>(null)
+  const [recordingState, setRecordingState] = useState<RecordingState>(initialRecordingState)
+  const [transcription, setTranscription] = useState<TranscriptionState>(initialTranscriptionState)
+
+  // 历史消息加载状态
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [hasMoreHistory, setHasMoreHistory] = useState(true)
+  const [historyOffset, setHistoryOffset] = useState(0)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+
+  // 流式消息状态
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingContent, setStreamingContent] = useState('')
+
+  // 项目ID（从session获取）
+  const [projectId, setProjectId] = useState<string | null>(null)
+
+  // 待处理的用户输入（用于取消后恢复）
+  const [pendingQuery, setPendingQuery] = useState('')
+
+  // 消息上下文（用于逐字稿修改等场景）
+  const [messageContext, setMessageContext] = useState<MessageContext | null>(null)
+
+  // 新保存的 Asset ID（用于侧边栏高亮提示）
+  const [newAssetId, setNewAssetId] = useState<string | null>(null)
+
+  const wsRef = useRef<WebSocket | null>(null)
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const streamingContentRef = useRef<string>('')  // 用于在回调中获取最新的流式内容
+
+  // 同步 streamingContent 到 ref
+  useEffect(() => {
+    streamingContentRef.current = streamingContent
+  }, [streamingContent])
+
+  // 获取 session 信息以获取 projectId
+  useEffect(() => {
+    if (sessionId) {
+      sessionsApi.get(sessionId)
+        .then((session) => {
+          setProjectId(session.project_id)
+        })
+        .catch((error) => {
+          console.error('Failed to get session:', error)
+        })
+    }
+  }, [sessionId])
+
+  // 生成唯一消息ID
+  const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+  // 将后端 Message 转换为前端 ChatMessage
+  const convertMessageToChatMessage = async (msg: Message): Promise<ChatMessage> => {
+    const chatMsg: ChatMessage = {
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant',
+      content: msg.content,
+      type: mapMessageType(msg.message_type),
+      timestamp: msg.created_at,
+      feedback: msg.feedback,
+      transcription: msg.transcript,
+      audioFileId: msg.audio_file_id,
+      isCancelled: msg.meta?.cancelled === true,  // 检查是否是被取消的消息
+    }
+
+    // 从 meta 中恢复保存状态
+    if (msg.meta?.pending_save && !msg.meta?.saved) {
+      chatMsg.pendingSave = {
+        ...msg.meta.pending_save,
+        messageId: msg.id
+      }
+      chatMsg.saveStatus = 'unsaved'
+    } else if (msg.meta?.saved) {
+      chatMsg.saveStatus = 'saved'
+    }
+
+    // 如果有音频文件ID，获取签名URL
+    if (msg.audio_file_id) {
+      try {
+        const { url } = await audioApi.getUrl(msg.audio_file_id)
+        chatMsg.audioUrl = url
+      } catch (e) {
+        console.warn('Failed to get audio URL:', e)
+      }
+    }
+
+    return chatMsg
+  }
+
+  // 映射消息类型
+  function mapMessageType(type?: string): ChatMessage['type'] {
+    switch (type) {
+      case 'voice_answer': return 'audio'
+      case 'feedback': return 'feedback'
+      case 'recording_prompt': return 'recording_prompt'
+      default: return 'text'
+    }
+  }
+
+  // 加载历史消息
+  const loadHistory = useCallback(async () => {
+    if (!sessionId || historyLoaded) return
+
+    setIsLoadingHistory(true)
+    try {
+      const response = await messagesApi.list(sessionId, {
+        limit: 20,
+        offset: 0,
+        order: 'desc'
+      })
+
+      // 转换消息格式并获取音频URL
+      const historyMessages = await Promise.all(
+        response.messages.map(convertMessageToChatMessage)
+      )
+
+      // 如果没有历史消息，添加欢迎消息
+      if (historyMessages.length === 0) {
+        setMessages([{
+          id: generateMessageId(),
+          role: 'assistant',
+          content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"我想练习xxx问题"  \n• **答案优化** - 说"帮我优化这个回答"  \n• **问题调研** - 说"这个问题怎么回答"  \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n直接输入你的需求，我会自动理解你的意图。',
+          type: 'text',
+          timestamp: new Date().toISOString()
+        }])
+      } else {
+        setMessages(historyMessages)
+      }
+
+      setHasMoreHistory(response.has_more)
+      setHistoryOffset(response.messages.length)
+      setHistoryLoaded(true)
+    } catch (error) {
+      console.error('Failed to load history:', error)
+      // 加载失败时显示欢迎消息
+      setMessages([{
+        id: generateMessageId(),
+        role: 'assistant',
+        content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"我想练习xxx问题"  \n• **答案优化** - 说"帮我优化这个回答"  \n• **问题调研** - 说"这个问题怎么回答"  \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n直接输入你的需求，我会自动理解你的意图。',
+        type: 'text',
+        timestamp: new Date().toISOString()
+      }])
+      setHistoryLoaded(true)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }, [sessionId, historyLoaded])
+
+  // 加载更多历史消息（向上滚动时调用）
+  const loadMoreHistory = useCallback(async () => {
+    if (isLoadingHistory || !hasMoreHistory || !sessionId) return
+
+    setIsLoadingHistory(true)
+    try {
+      const response = await messagesApi.list(sessionId, {
+        limit: 20,
+        offset: historyOffset,
+        order: 'desc'
+      })
+
+      const olderMessages = await Promise.all(
+        response.messages.map(convertMessageToChatMessage)
+      )
+
+      // 将旧消息添加到列表开头
+      setMessages(prev => [...olderMessages, ...prev])
+      setHasMoreHistory(response.has_more)
+      setHistoryOffset(prev => prev + response.messages.length)
+    } catch (error) {
+      console.error('Failed to load more history:', error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }, [sessionId, historyOffset, isLoadingHistory, hasMoreHistory])
+
+  // 页面加载时获取历史消息
+  useEffect(() => {
+    loadHistory()
+  }, [loadHistory])
+
+  // 连接 WebSocket
+  useEffect(() => {
+    if (!sessionId) return
+
+    // 获取 Token 用于 WebSocket 认证
+    const token = getToken()
+    if (!token) {
+      console.error('No auth token, cannot connect WebSocket')
+      return
+    }
+
+    const wsUrl = `ws://localhost:8001/ws/chat/${sessionId}?token=${encodeURIComponent(token)}`
+    const ws = new WebSocket(wsUrl)
+
+    ws.onopen = () => {
+      console.log('WebSocket connected')
+      setIsConnected(true)
+    }
+
+    ws.onmessage = (event) => {
+      const message: ServerMessage = JSON.parse(event.data)
+      console.log('WebSocket message:', message)
+
+      // 更新 Agent 状态
+      if (message.agent_status) {
+        setCurrentAgent(message.agent_status.current_agent as CurrentAgent)
+        setAgentStatus(message.agent_status.status as AgentStatus)
+      }
+
+      // 根据消息类型处理
+      switch (message.type) {
+        case 'assistant_message':
+          setAgentStatus('idle')
+          setMessages((prev) => [...prev, {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: message.content || '',
+            type: 'text',
+            assetId: message.asset_id,  // 支持关联 Asset
+            timestamp: message.timestamp
+          }])
+          break
+
+        // 流式消息处理
+        case 'assistant_message_stream_start':
+          setIsStreaming(true)
+          setStreamingContent('')
+          setAgentStatus('idle')  // 流式开始后停止3点动画
+          break
+
+        case 'assistant_message_chunk':
+          setStreamingContent(prev => prev + (message.content || ''))
+          break
+
+        case 'assistant_message_stream_end':
+          setIsStreaming(false)
+          setAgentStatus('idle')
+          // 将完整消息添加到消息列表（使用后端返回的 message_id）
+          const streamEndMsgId = (message as any).message_id || generateMessageId()
+          const streamEndMsg: ChatMessage = {
+            id: streamEndMsgId,
+            role: 'assistant',
+            content: message.full_content || streamingContent,
+            type: 'text',
+            assetId: message.asset_id,  // 关联保存的 Asset
+            timestamp: message.timestamp
+          }
+          // 如果有待保存数据，绑定到消息上
+          if (message.pending_save) {
+            streamEndMsg.pendingSave = {
+              ...message.pending_save,
+              messageId: streamEndMsgId
+            }
+            streamEndMsg.saveStatus = 'unsaved'
+          }
+          setMessages((prev) => [...prev, streamEndMsg])
+          setStreamingContent('')
+          // 如果有新保存的 Asset，通知侧边栏高亮
+          if (message.asset_id) {
+            setNewAssetId(message.asset_id)
+          }
+          break
+
+        case 'recording_start':
+          // AI要求开始录音，自动弹出录音卡片
+          setAgentStatus('recording')
+          const question = message.recording?.question || ''
+          setRecordingState({
+            isActive: true,
+            isRecording: false,  // 用户需要手动开始
+            question,
+            duration: 0
+          })
+          // 添加录音提示消息
+          setMessages((prev) => [...prev, {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: '请点击下方按钮开始录音回答',
+            type: 'recording_prompt',
+            question,
+            timestamp: message.timestamp
+          }])
+          break
+
+        case 'transcription':
+          console.log('>>> 收到 transcription 消息:', message.timestamp)
+          setAgentStatus('transcribing')
+          setTranscription({
+            text: message.transcription?.text || null,
+            isFinal: message.transcription?.is_final || false
+          })
+          if (message.transcription?.is_final) {
+            // 转录完成，立即添加用户语音消息（含音频文件ID和句子时间戳）
+            const userVoiceMsgId = generateMessageId()
+            const userVoiceMsg: ChatMessage = {
+              id: userVoiceMsgId,
+              role: 'user',
+              content: message.transcription?.text || '',
+              type: 'audio',
+              transcription: message.transcription?.text,
+              transcriptSentences: message.transcript_sentences,  // 带时间戳的句子
+              audioFileId: message.audio_file_id,  // 音频文件ID
+              timestamp: message.timestamp
+            }
+            console.log('>>> 添加用户语音消息:', userVoiceMsgId)
+            setMessages((prev) => [...prev, userVoiceMsg])
+
+            // 如果有音频文件ID，获取签名URL
+            if (message.audio_file_id) {
+              audioApi.getUrl(message.audio_file_id)
+                .then(({ url }) => {
+                  setMessages(prev => prev.map(m =>
+                    m.id === userVoiceMsgId ? { ...m, audioUrl: url } : m
+                  ))
+                })
+                .catch(e => console.error('获取音频 URL 失败:', e))
+            }
+
+            setAgentStatus('analyzing')  // 显示3点等待动画
+          }
+          break
+
+        case 'feedback':
+          console.log('>>> 收到 feedback 消息:', message.timestamp)
+          setAgentStatus('idle')
+          setRecordingState(initialRecordingState)
+          setTranscription(initialTranscriptionState)
+          setIsSubmitted(false)  // 重置提交状态
+
+          // 添加反馈消息（不再包含转录相关字段，因为已在用户消息中显示）
+          const feedbackMsg: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: 'STAR分析结果',
+            type: 'feedback',
+            feedback: message.feedback,
+            assetId: message.asset_id,
+            // 不再传递: transcription, transcriptSentences, audioFileId, audioUrl
+            timestamp: message.timestamp
+          }
+
+          setMessages((prev) => [...prev, feedbackMsg])
+          break
+
+        case 'error':
+          setAgentStatus('idle')
+          setRecordingState(initialRecordingState)
+          setIsStreaming(false)
+          setStreamingContent('')
+          console.error('WebSocket error:', message.error || message.content)
+          setMessages((prev) => [...prev, {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: message.error || message.content || '发生错误，请重试',
+            type: 'text',
+            timestamp: message.timestamp
+          }])
+          break
+
+        case 'generation_cancelled':
+          // 服务端确认取消，保留已生成的内容
+          console.log('Generation cancelled by server, partial_content:', message.partial_content, 'streamingContentRef:', streamingContentRef.current)
+          setAgentStatus('idle')
+          setIsStreaming(false)
+
+          // 获取已生成的部分内容（优先使用服务端返回的，否则使用本地流式内容 ref）
+          const partialContent = message.partial_content || streamingContentRef.current
+
+          if (partialContent) {
+            // 保留已生成的内容，并添加暂停提示
+            setMessages((prev) => [...prev, {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: partialContent,
+              type: 'text',
+              timestamp: message.timestamp,
+              isCancelled: true  // 标记为已取消的消息
+            }])
+          }
+
+          setStreamingContent('')
+          break
+
+        default:
+          console.warn('Unknown message type:', message.type, message)
+          // 如果有 content，仍然显示
+          if (message.content) {
+            setMessages((prev) => [...prev, {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: message.content || '',
+              type: 'text',
+              timestamp: message.timestamp
+            }])
+          }
+          setAgentStatus('idle')
+          break
+      }
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+    }
+
+    ws.onclose = () => {
+      console.log('WebSocket disconnected')
+      setIsConnected(false)
+    }
+
+    wsRef.current = ws
+
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+      }
+      ws.close()
+    }
+  }, [sessionId])
+
+  // 发送文本消息
+  const sendMessage = useCallback((content: string, context?: MessageContext) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const timestamp = new Date().toISOString()
+
+      // 保存用户输入（用于取消后恢复）
+      setPendingQuery(content)
+
+      // 使用传入的 context 或当前状态中的 messageContext
+      const contextToSend = context || messageContext
+
+      // 发送消息到服务器（包含 context）
+      wsRef.current.send(JSON.stringify({
+        type: 'message',
+        content,
+        context: contextToSend,
+        timestamp
+      }))
+
+      // 发送后清空 messageContext
+      if (contextToSend) {
+        setMessageContext(null)
+      }
+
+      // 立即显示用户消息
+      setMessages((prev) => [...prev, {
+        id: generateMessageId(),
+        role: 'user',
+        content,
+        type: 'text',
+        timestamp
+      }])
+
+      // 设置为思考状态
+      setAgentStatus('thinking')
+    }
+  }, [messageContext])
+
+  // 提交音频
+  const submitAudio = useCallback((audioData: string) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const timestamp = new Date().toISOString()
+
+      wsRef.current.send(JSON.stringify({
+        type: 'audio',
+        audio_data: audioData,
+        timestamp
+      }))
+
+      // 停止录音计时器
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+
+      // 更新状态
+      setRecordingState((prev) => ({
+        ...prev,
+        isRecording: false
+      }))
+      setIsSubmitted(true)  // 设置为已提交状态
+      setAgentStatus('transcribing')
+    }
+  }, [])
+
+  // 开始录音（用户手动点击）
+  const startRecording = useCallback(() => {
+    setRecordingState((prev) => ({
+      ...prev,
+      isRecording: true,
+      duration: 0
+    }))
+
+    // 开始计时
+    recordingTimerRef.current = setInterval(() => {
+      setRecordingState((prev) => ({
+        ...prev,
+        duration: prev.duration + 1
+      }))
+    }, 1000)
+  }, [])
+
+  // 停止录音
+  const stopRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+
+    setRecordingState((prev) => ({
+      ...prev,
+      isRecording: false
+    }))
+  }, [])
+
+  // 取消录音
+  const cancelRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+
+    setRecordingState(initialRecordingState)
+    setAgentStatus('idle')
+  }, [])
+
+  // 取消生成（停止模型输出）
+  const cancelGeneration = useCallback((): string => {
+    // 发送取消消息到服务器
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'cancel',
+        timestamp: new Date().toISOString()
+      }))
+    }
+
+    // 只重置 agent 状态，不清空 streamingContent
+    // streamingContent 会在收到 generation_cancelled 消息后处理
+    setAgentStatus('idle')
+    setMessageContext(null)  // 清除消息上下文，避免影响下一次发送
+
+    // 返回待恢复的query并清空
+    const queryToRestore = pendingQuery
+    setPendingQuery('')
+    return queryToRestore
+  }, [pendingQuery])
+
+  // 构建状态对象
+  const state = {
+    isConnected,
+    messages,
+    agentStatus,
+    currentAgent,
+    recordingState,
+    transcription,
+    isLoadingHistory,
+    hasMoreHistory,
+    isSubmitted,  // 新增
+    isStreaming,  // 新增：流式状态
+    streamingContent,  // 新增：流式内容
+    projectId,  // 新增：项目ID
+    pendingQuery,  // 新增：待恢复的用户输入
+    messageContext,  // 新增：消息上下文
+    newAssetId,  // 新增：新保存的 Asset ID（用于侧边栏高亮）
+  }
+
+  // 清除新 Asset 高亮
+  const clearNewAssetId = useCallback(() => {
+    setNewAssetId(null)
+  }, [])
+
+  // 确认保存（用户点击"保存到练习记录"后调用，按消息ID）
+  const confirmSave = useCallback(async (messageId: string) => {
+    // 从消息列表中查找对应消息的 pendingSave 数据
+    const targetMsg = messages.find(m => m.id === messageId)
+    if (!targetMsg?.pendingSave) return
+
+    try {
+      const result = await assetsApi.confirmSave({
+        question: targetMsg.pendingSave.question,
+        transcript: targetMsg.pendingSave.transcript,
+        project_id: targetMsg.pendingSave.project_id,
+        message_id: messageId
+      })
+      // 保存成功，更新该消息的 saveStatus 为 'saved'
+      setMessages(prev => prev.map(m =>
+        m.id === messageId
+          ? { ...m, saveStatus: 'saved' as const, assetId: result.asset_id, pendingSave: null }
+          : m
+      ))
+      // 设置新 Asset ID 以高亮侧边栏
+      setNewAssetId(result.asset_id)
+    } catch (error) {
+      console.error('保存失败:', error)
+    }
+  }, [messages])
+
+  return {
+    state,
+    sendMessage,
+    setMessageContext,
+    submitAudio,
+    startRecording,
+    stopRecording,
+    cancelRecording,
+    cancelGeneration,
+    loadMoreHistory,
+    clearNewAssetId,  // 清除高亮
+    confirmSave,  // 确认保存（按消息ID）
+  }
+}

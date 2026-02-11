@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:help.aliyun.com)",
+      "WebFetch(domain:qwenlm.github.io)",
+      "Bash(find:*)",
+      "Bash(dir:*)",
+      "Bash(mkdir:*)",
+      "Bash(pip show:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(netstat:*)",
+      "Bash(ss:*)",
+      "Bash(findstr:*)",
+      "Bash(npm install react-markdown remark-gfm)",
+      "Bash(timeout 5 bash:*)",
+      "Bash(npm run dev)",
+      "Bash(ffmpeg:*)",
+      "Bash(export PATH:*)",
+      "Bash(taskkill:*)",
+      "Bash(tasklist:*)",
+      "Bash(npm run build)",
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(grep:*)",
+      "Bash(npm install:*)",
+      "Bash(cat:*)",
+      "Bash(curl:*)",
+      "Bash(npx next build:*)",
+      "Skill(frontend-design)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

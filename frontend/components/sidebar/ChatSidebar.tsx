@@ -1,0 +1,400 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { Asset, Session, Project, MessageContext } from '@/lib/types'
+import { assetsApi, sessionsApi, projectsApi } from '@/lib/api-client'
+
+interface FillInputData {
+  content: string
+  context: MessageContext
+}
+
+interface ChatSidebarProps {
+  projectId: string
+  currentSessionId: string
+  isOpen: boolean
+  onToggle: () => void
+  onFillInput: (data: FillInputData) => void  // 载入到输入框优化
+  onSelectAsset: (asset: Asset) => void       // 打开详情面板
+  onSessionChange?: (sessionId: string) => void
+  newAssetId?: string | null                  // 新保存的 Asset ID（用于高亮）
+  onNewAssetShown?: () => void                // 高亮结束后的回调
+  refreshKey?: number                         // 刷新触发器
+}
+
+export function ChatSidebar({
+  projectId,
+  currentSessionId,
+  isOpen,
+  onToggle,
+  onFillInput,
+  onSelectAsset,
+  onSessionChange,
+  newAssetId,
+  onNewAssetShown,
+  refreshKey
+}: ChatSidebarProps) {
+  const router = useRouter()
+  const [project, setProject] = useState<Project | null>(null)
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [loading, setLoading] = useState(true)
+  const [creatingSession, setCreatingSession] = useState(false)
+  const [deletingQuestion, setDeletingQuestion] = useState<string | null>(null)
+  const [highlightedQuestion, setHighlightedQuestion] = useState<string | null>(null)
+
+  // 加载数据
+  useEffect(() => {
+    if (projectId) {
+      loadData()
+    }
+  }, [projectId])
+
+  // 刷新触发器
+  useEffect(() => {
+    if (refreshKey !== undefined && refreshKey > 0) {
+      refreshAssets()
+    }
+  }, [refreshKey])
+
+  // 处理新 Asset 高亮
+  useEffect(() => {
+    if (newAssetId) {
+      // 刷新 Asset 列表后查找新 Asset
+      refreshAssets().then(() => {
+        // 延迟一点确保 assets 状态已更新
+        setTimeout(() => {
+          const newAsset = assets.find(a => a.id === newAssetId)
+          if (newAsset) {
+            setHighlightedQuestion(newAsset.question)
+            // 3秒后清除高亮
+            setTimeout(() => {
+              setHighlightedQuestion(null)
+              onNewAssetShown?.()
+            }, 3000)
+          } else {
+            // 如果在当前 assets 中没找到，可能需要等待刷新完成
+            onNewAssetShown?.()
+          }
+        }, 100)
+      })
+    }
+  }, [newAssetId])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const [projectData, sessionsData, assetsResponse] = await Promise.all([
+        projectsApi.get(projectId),
+        sessionsApi.list(projectId),
+        assetsApi.list(projectId)
+      ])
+      setProject(projectData)
+      setSessions(sessionsData)
+      setAssets(assetsResponse.assets)
+    } catch (error) {
+      console.error('Failed to load sidebar data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // 刷新资产列表
+  const refreshAssets = async () => {
+    try {
+      const response = await assetsApi.list(projectId)
+      setAssets(response.assets)
+    } catch (error) {
+      console.error('Failed to refresh assets:', error)
+    }
+  }
+
+  // 创建新会话
+  const handleCreateSession = async () => {
+    setCreatingSession(true)
+    try {
+      const session = await sessionsApi.create({
+        project_id: projectId,
+        title: `练习 ${new Date().toLocaleString()}`
+      })
+      setSessions(prev => [session, ...prev])
+      router.push(`/chat/${session.id}`)
+    } catch (error) {
+      console.error('Failed to create session:', error)
+      alert('创建会话失败')
+    } finally {
+      setCreatingSession(false)
+    }
+  }
+
+  // 切换会话
+  const handleSwitchSession = (sessionId: string) => {
+    if (sessionId !== currentSessionId) {
+      router.push(`/chat/${sessionId}`)
+      onSessionChange?.(sessionId)
+    }
+  }
+
+  // 返回项目列表
+  const handleBackToProjects = () => {
+    router.push('/projects')
+  }
+
+  // 按问题分组资产
+  const groupedAssets = assets.reduce((groups, asset) => {
+    const question = asset.question
+    if (!groups[question]) {
+      groups[question] = []
+    }
+    groups[question].push(asset)
+    return groups
+  }, {} as Record<string, Asset[]>)
+
+  // 格式化时间
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+
+    if (days === 0) {
+      return '今天'
+    } else if (days === 1) {
+      return '昨天'
+    } else if (days < 7) {
+      return `${days}天前`
+    } else {
+      return date.toLocaleDateString()
+    }
+  }
+
+  // 删除整个问题及其所有版本
+  const handleDeleteQuestion = async (question: string, questionAssets: Asset[]) => {
+    if (!confirm(`确定要删除"${question.slice(0, 30)}..."及其所有练习记录吗？`)) {
+      return
+    }
+
+    setDeletingQuestion(question)
+    try {
+      for (const asset of questionAssets) {
+        await assetsApi.delete(asset.id)
+      }
+      await refreshAssets()
+    } catch (error) {
+      console.error('Failed to delete question:', error)
+      alert('删除失败，请重试')
+    } finally {
+      setDeletingQuestion(null)
+    }
+  }
+
+  return (
+    <>
+      {/* 侧边栏 */}
+      <div
+        className={`h-full bg-cream-50 border-r border-cream-300 transition-all duration-300 flex flex-col ${
+          isOpen ? 'w-72' : 'w-0'
+        } overflow-hidden flex-shrink-0`}
+      >
+        {/* 头部 - 项目信息 */}
+        <div className="px-4 py-3 border-b border-cream-300 flex-shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={handleBackToProjects}
+              className="flex items-center gap-1 text-sm text-cream-400 hover:text-ink-200 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              返回
+            </button>
+            <button
+              onClick={onToggle}
+              className="p-1 hover:bg-cream-200 rounded transition-colors text-cream-400 hover:text-ink-100"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+              </svg>
+            </button>
+          </div>
+          <h2 className="font-serif text-sm font-medium text-ink-300 truncate" title={project?.title}>
+            {project?.title || '加载中...'}
+          </h2>
+        </div>
+
+        {/* 内容区域 */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-warm-300"></div>
+            </div>
+          ) : (
+            <>
+              {/* 会话记录区域 */}
+              <div className="border-b border-cream-300">
+                <div className="px-4 py-2 flex items-center justify-between">
+                  <h3 className="font-serif text-xs text-cream-400 uppercase tracking-widest">会话记录</h3>
+                  <button
+                    onClick={handleCreateSession}
+                    disabled={creatingSession}
+                    className="flex items-center gap-1 text-xs text-warm-300 hover:text-warm-400 disabled:opacity-50 transition-colors"
+                  >
+                    {creatingSession ? (
+                      <div className="w-3 h-3 animate-spin rounded-full border border-warm-300 border-t-transparent"></div>
+                    ) : (
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    )}
+                    新建
+                  </button>
+                </div>
+                <div className="px-2 pb-2 space-y-1 max-h-48 overflow-y-auto">
+                  {sessions.length === 0 ? (
+                    <p className="px-2 py-2 text-xs text-cream-400 text-center font-light">暂无会话</p>
+                  ) : (
+                    sessions.map((session) => (
+                      <button
+                        key={session.id}
+                        onClick={() => handleSwitchSession(session.id)}
+                        className={`w-full text-left px-3 py-2 rounded-button text-sm transition-all ${
+                          session.id === currentSessionId
+                            ? 'bg-warm-50 text-warm-400 font-medium'
+                            : 'text-ink-100 hover:bg-cream-200'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="truncate flex-1">
+                            {session.title || '未命名会话'}
+                          </span>
+                          {session.id === currentSessionId && (
+                            <span className="ml-2 w-1.5 h-1.5 bg-warm-300 rounded-full flex-shrink-0"></span>
+                          )}
+                        </div>
+                        <div className="text-xs text-cream-400 mt-0.5 font-light">
+                          {formatTime(session.started_at)}
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* 练习记录区域 */}
+              <div>
+                <div className="px-4 py-2">
+                  <h3 className="font-serif text-xs text-cream-400 uppercase tracking-widest">练习记录</h3>
+                </div>
+                {Object.keys(groupedAssets).length === 0 ? (
+                  <div className="px-4 py-6 text-center">
+                    <svg className="mx-auto h-8 w-8 text-cream-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                    </svg>
+                    <p className="mt-2 text-xs text-cream-400 font-light">暂无练习记录</p>
+                  </div>
+                ) : (
+                  <div className="px-2 pb-2 space-y-1">
+                    {Object.entries(groupedAssets).map(([question, questionAssets]) => {
+                      const sortedAssets = questionAssets.sort(
+                        (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+                      )
+                      const latestAsset = sortedAssets[0]
+                      const isDeleting = deletingQuestion === question
+
+                      return (
+                        <div key={question} className="group">
+                          <div
+                            onClick={() => {
+                              // 点击问题时，打开详情面板
+                              onSelectAsset(latestAsset)
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded-button transition-all cursor-pointer ${
+                              highlightedQuestion === question
+                                ? 'ring-2 ring-warm-200 bg-warm-50 animate-pulse'
+                                : 'hover:bg-cream-200'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <h4 className="text-sm text-ink-200 line-clamp-2 flex-1 pr-2" title={question}>
+                                {question}
+                              </h4>
+                              {/* 小飞机按钮 - 载入到输入框优化 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onFillInput({
+                                    content: latestAsset.transcript || '',
+                                    context: {
+                                      question: latestAsset.question,
+                                      original_transcript: latestAsset.transcript || '',
+                                      asset_id: latestAsset.id
+                                    }
+                                  })
+                                }}
+                                title="载入到输入框优化"
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-warm-50 rounded transition-all text-cream-400 hover:text-warm-300 flex-shrink-0"
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                </svg>
+                              </button>
+                              {/* 删除按钮 */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDeleteQuestion(question, questionAssets)
+                                }}
+                                disabled={isDeleting}
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-rose-50 rounded transition-all text-cream-400 hover:text-rose-300 flex-shrink-0 ml-1"
+                              >
+                                {isDeleting ? (
+                                  <div className="w-3 h-3 animate-spin rounded-full border border-rose-300 border-t-transparent"></div>
+                                ) : (
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-tag ${
+                                latestAsset.version_type === 'recording'
+                                  ? 'bg-cream-200 text-ink-50'
+                                  : 'bg-warm-50 text-warm-300'
+                              }`}>
+                                {latestAsset.version_type === 'recording' ? '录音' : '优化'}
+                              </span>
+                              <span className="text-xs text-cream-400 font-light">
+                                {questionAssets.length > 1 ? `${questionAssets.length}个版本` : ''}
+                              </span>
+                              <span className="text-xs text-cream-400 font-display ml-auto">
+                                {formatTime(latestAsset.updated_at)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* 收起时的展开按钮 */}
+      {!isOpen && (
+        <button
+          onClick={onToggle}
+          className="absolute left-0 top-1/2 -translate-y-1/2 bg-cream-50 border border-cream-300 border-l-0 rounded-r-button p-2 shadow-subtle hover:bg-cream-200 transition-colors z-10"
+        >
+          <svg className="w-4 h-4 text-cream-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+          </svg>
+        </button>
+      )}
+    </>
+  )
+}
