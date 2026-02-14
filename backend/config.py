@@ -29,15 +29,6 @@ class Settings(BaseSettings):
     aliyun_oss_bucket: str
     aliyun_oss_endpoint: str
 
-    # Aliyun SMS (短信服务)
-    aliyun_sms_sign_name: str = ""  # 短信签名，如"AI面试助手"
-    aliyun_sms_template_code: str = ""  # 短信模板CODE
-
-    # JWT Authentication
-    jwt_secret_key: Optional[str] = None  # 如果不设置，使用 secret_key
-    jwt_algorithm: str = "HS256"
-    jwt_expire_days: int = 7  # Token 有效期（天）
-
     # DashScope (百炼平台 - 通义千问ASR)
     dashscope_api_key: str
     dashscope_asr_model: str = "qwen3-asr-flash-realtime"
@@ -50,6 +41,15 @@ class Settings(BaseSettings):
     app_env: str = "development"
     secret_key: str
     cors_origins: str = "http://localhost:3000,http://localhost:3001"
+
+    # JWT 认证
+    jwt_secret_key: Optional[str] = None  # 如果不设置，使用 secret_key
+    jwt_algorithm: str = "HS256"
+    jwt_expire_days: int = 7
+
+    # 阿里云短信
+    aliyun_sms_sign_name: Optional[str] = None  # 短信签名
+    aliyun_sms_template_code: Optional[str] = None  # 短信模板代码
 
     @property
     def cors_origins_list(self) -> List[str]:

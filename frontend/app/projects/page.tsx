@@ -94,7 +94,7 @@ export default function ProjectsPage() {
           <h1 className="font-serif text-2xl text-ink-300 tracking-tight">我的项目</h1>
           <Link
             href="/projects/new"
-            className="inline-flex items-center gap-2 px-5 py-2.5 border border-ink-300 text-ink-300 text-sm font-medium rounded-button hover:bg-ink-300 hover:text-cream-50 transition-all duration-300"
+            className="inline-flex items-center gap-2 px-5 py-2.5 border border-warm-300 text-warm-300 text-sm font-medium rounded-button hover:bg-warm-300 hover:text-white transition-all duration-300"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
@@ -127,27 +127,46 @@ export default function ProjectsPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: 'easeOut', delay: index * 0.06 }}
-                onClick={() => handleProjectClick(project)}
-                className={`p-6 bg-cream-200/50 border border-cream-300 rounded-card cursor-pointer
+                className={`p-6 bg-cream-200/50 border border-cream-300 rounded-card
                   hover:-translate-y-0.5 hover:shadow-card transition-all duration-300
                   ${navigatingProjectId === project.id ? 'opacity-50' : ''}`}
               >
-                <h2 className="font-serif text-lg text-ink-300 mb-2 truncate">
-                  {project.title}
-                </h2>
-                <p className="text-sm text-ink-50 line-clamp-2 mb-4 font-light leading-relaxed">
-                  {project.jd_text}
-                </p>
+                <div
+                  onClick={() => handleProjectClick(project)}
+                  className="cursor-pointer"
+                >
+                  <h2 className="font-serif text-lg text-ink-300 mb-2 truncate">
+                    {project.title}
+                  </h2>
+                  <p className="text-sm text-ink-50 line-clamp-2 mb-4 font-light leading-relaxed">
+                    {project.jd_text}
+                  </p>
+                </div>
                 <div className="flex items-center justify-between">
                   <span className="font-display text-xs text-cream-400">
                     {new Date(project.created_at).toLocaleDateString()}
                   </span>
-                  {navigatingProjectId === project.id && (
-                    <div className="flex items-center gap-1.5 text-xs text-ink-50">
-                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-warm-300"></div>
-                      <span className="font-light">进入中...</span>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {navigatingProjectId === project.id ? (
+                      <div className="flex items-center gap-1.5 text-xs text-ink-50">
+                        <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-warm-300"></div>
+                        <span className="font-light">进入中...</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          router.push(`/projects/${project.id}/edit`)
+                        }}
+                        className="p-1.5 text-cream-400 hover:text-warm-300 hover:bg-warm-50 rounded-button transition-colors"
+                        title="编辑项目"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             ))}

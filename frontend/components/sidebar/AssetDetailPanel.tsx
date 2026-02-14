@@ -114,7 +114,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <span className="text-xs text-cream-400 font-display">
+                <span className="text-xs text-cream-400 tabular-nums">
                   版本 {currentAsset.version} / {versions.length}
                 </span>
                 <button
@@ -133,7 +133,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               </div>
             )}
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs text-cream-400 font-display">v{currentAsset.version}</span>
+              <span className="text-xs text-cream-400 tabular-nums">v{currentAsset.version}</span>
               <span className="text-xs text-cream-400">·</span>
               {/* 版本类型标签 */}
               <span className={`text-xs px-1.5 py-0.5 rounded-tag ${
@@ -148,7 +148,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
                 {new Date(currentAsset.updated_at).toLocaleString()}
               </span>
             </div>
-            <h2 className="font-serif text-lg text-ink-300">{currentAsset.question}</h2>
+            <h2 className="font-semibold text-lg text-ink-300">{currentAsset.question}</h2>
           </div>
           <button
             onClick={onClose}
@@ -173,7 +173,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
                     : 'bg-cream-50 text-ink-50 hover:bg-cream-200 border border-cream-300'
                 }`}
               >
-                <span className="font-display">v{v.version}</span>
+                <span className="tabular-nums">v{v.version}</span>
                 <span className={`text-xs ${
                   index === currentVersionIndex
                     ? 'text-cream-300'
@@ -198,7 +198,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               {currentAsset.transcript && (
                 <div className="mb-6">
                   <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-serif text-sm text-ink-50">逐字稿</h3>
+                    <h3 className="font-medium text-sm text-ink-50">逐字稿</h3>
                     {!isEditing && (
                       <div className="flex items-center gap-3">
                         {onUpdate && (
@@ -264,7 +264,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               {/* STAR 分析 */}
               {currentAsset.star_structure?.analysis && (
                 <div className="mb-6">
-                  <h3 className="font-serif text-sm text-ink-50 mb-2">STAR 分析</h3>
+                  <h3 className="font-medium text-sm text-ink-50 mb-2">STAR 分析</h3>
                   <div className="text-xs text-ink-100 bg-cream-100 rounded-card p-4 whitespace-pre-wrap leading-relaxed">
                     {currentAsset.star_structure.analysis}
                   </div>
@@ -274,7 +274,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               {/* 标签 */}
               {currentAsset.tags && currentAsset.tags.length > 0 && (
                 <div>
-                  <h3 className="font-serif text-sm text-ink-50 mb-2">标签</h3>
+                  <h3 className="font-medium text-sm text-ink-50 mb-2">标签</h3>
                   <div className="flex flex-wrap gap-2">
                     {currentAsset.tags.map((tag, index) => (
                       <span

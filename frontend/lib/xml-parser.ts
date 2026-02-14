@@ -15,6 +15,14 @@ export interface ParsedScript {
   raw: string
 }
 
+export interface ParsedFeedback {
+  analysis: string | null
+  strengths: string | null
+  improvements: string | null
+  encouragement: string | null
+  raw: string
+}
+
 /**
  * 解析优化答案的 XML 标签（支持流式输出，标签可能不完整）
  * 格式: <optimized>...</optimized><reason>...</reason>
@@ -122,10 +130,98 @@ export function hasScriptTags(content: string): boolean {
 }
 
 /**
+ * 检查内容是否包含录音分析的 XML 标签（支持流式，只需开始标签）
+ */
+export function hasFeedbackTags(content: string): boolean {
+  return content.includes('<analysis>') && !content.includes('<optimized>')
+}
+
+/**
+ * 解析录音分析的 XML 标签（支持流式输出，标签可能不完整）
+ * 格式: <analysis>...</analysis><strengths>...</strengths><improvements>...</improvements>
+ */
+export function parseFeedback(content: string): ParsedFeedback {
+  // 解析 analysis 标签
+  let analysisMatch = content.match(/<analysis>([\s\S]*?)<\/analysis>/)
+  let analysis: string | null = null
+
+  if (analysisMatch) {
+    analysis = analysisMatch[1].trim()
+  } else {
+    const openAnalysisMatch = content.match(/<analysis>([\s\S]*)/)
+    if (openAnalysisMatch) {
+      let partialAnalysis = openAnalysisMatch[1]
+      const strengthsStartIndex = partialAnalysis.indexOf('<strengths>')
+      if (strengthsStartIndex !== -1) {
+        partialAnalysis = partialAnalysis.substring(0, strengthsStartIndex)
+      }
+      analysis = partialAnalysis.trim() || null
+    }
+  }
+
+  // 解析 strengths 标签
+  let strengthsMatch = content.match(/<strengths>([\s\S]*?)<\/strengths>/)
+  let strengths: string | null = null
+
+  if (strengthsMatch) {
+    strengths = strengthsMatch[1].trim()
+  } else {
+    const openStrengthsMatch = content.match(/<strengths>([\s\S]*)/)
+    if (openStrengthsMatch) {
+      let partialStrengths = openStrengthsMatch[1]
+      const improvementsStartIndex = partialStrengths.indexOf('<improvements>')
+      if (improvementsStartIndex !== -1) {
+        partialStrengths = partialStrengths.substring(0, improvementsStartIndex)
+      }
+      strengths = partialStrengths.trim() || null
+    }
+  }
+
+  // 解析 improvements 标签
+  let improvementsMatch = content.match(/<improvements>([\s\S]*?)<\/improvements>/)
+  let improvements: string | null = null
+
+  if (improvementsMatch) {
+    improvements = improvementsMatch[1].trim()
+  } else {
+    const openImprovementsMatch = content.match(/<improvements>([\s\S]*)/)
+    if (openImprovementsMatch) {
+      let partialImprovements = openImprovementsMatch[1]
+      const encouragementStartIndex = partialImprovements.indexOf('<encouragement>')
+      if (encouragementStartIndex !== -1) {
+        partialImprovements = partialImprovements.substring(0, encouragementStartIndex)
+      }
+      improvements = partialImprovements.trim() || null
+    }
+  }
+
+  // 解析 encouragement 标签
+  let encouragementMatch = content.match(/<encouragement>([\s\S]*?)<\/encouragement>/)
+  let encouragement: string | null = null
+
+  if (encouragementMatch) {
+    encouragement = encouragementMatch[1].trim()
+  } else {
+    const openEncouragementMatch = content.match(/<encouragement>([\s\S]*)/)
+    if (openEncouragementMatch) {
+      encouragement = openEncouragementMatch[1].trim() || null
+    }
+  }
+
+  return {
+    analysis,
+    strengths,
+    improvements,
+    encouragement,
+    raw: content
+  }
+}
+
+/**
  * 检查内容是否包含任何已知的 XML 标签
  */
 export function hasAnyXmlTags(content: string): boolean {
-  return hasOptimizedAnswerTags(content) || hasScriptTags(content)
+  return hasOptimizedAnswerTags(content) || hasScriptTags(content) || hasFeedbackTags(content)
 }
 
 /**
@@ -136,6 +232,9 @@ export function stripXmlTags(content: string): string {
     .replace(/<optimized>[\s\S]*?<\/optimized>/g, '')
     .replace(/<reason>[\s\S]*?<\/reason>/g, '')
     .replace(/<analysis>[\s\S]*?<\/analysis>/g, '')
+    .replace(/<strengths>[\s\S]*?<\/strengths>/g, '')
+    .replace(/<improvements>[\s\S]*?<\/improvements>/g, '')
+    .replace(/<encouragement>[\s\S]*?<\/encouragement>/g, '')
     .replace(/<script>[\s\S]*?<\/script>/g, '')
     .replace(/<tips>[\s\S]*?<\/tips>/g, '')
     .trim()

@@ -359,7 +359,7 @@ async def websocket_endpoint(
             transcript: str,
             transcript_sentences: list,
             audio_file_id: str,
-            question: str
+            current_question: str = ""
         ):
             logger.info(f">>> on_transcription_callback 被调用")
             await websocket.send_json({
@@ -377,12 +377,39 @@ async def websocket_endpoint(
                 message_type="voice_answer",
                 audio_file_id=UUID(audio_file_id) if audio_file_id else None,
                 transcript=transcript,
-                meta={"question": question}
+                meta={
+                    "question": current_question,
+                    "transcript_sentences": transcript_sentences
+                }
             )
             db.add(user_answer)
             db.commit()
 
         register_callback(session_id, "on_transcription", on_transcription_callback)
+
+        # 定义流式反馈回调函数
+        async def on_feedback_stream_start_callback():
+            logger.info(f">>> on_feedback_stream_start_callback 被调用")
+            await websocket.send_json({
+                "type": "feedback_stream_start",
+                "agent_status": {"current_agent": "interviewer", "status": "analyzing"},
+                "timestamp": datetime.now().isoformat()
+            })
+
+        async def on_feedback_chunk_callback(content: str):
+            await websocket.send_json({
+                "type": "feedback_chunk",
+                "content": content,
+                "timestamp": datetime.now().isoformat()
+            })
+
+        async def on_feedback_stream_end_callback(full_content: str, feedback: dict):
+            logger.info(f">>> on_feedback_stream_end_callback 被调用")
+            # 不在这里发送结束消息，让主流程处理保存和发送
+
+        register_callback(session_id, "on_feedback_stream_start", on_feedback_stream_start_callback)
+        register_callback(session_id, "on_feedback_chunk", on_feedback_chunk_callback)
+        register_callback(session_id, "on_feedback_stream_end", on_feedback_stream_end_callback)
 
         try:
             result = await process_message(
@@ -410,6 +437,16 @@ async def websocket_endpoint(
 
             if response_type == "recording_start":
                 question = response_metadata.get("question", new_question)
+                # 保存 recording_prompt 消息到数据库
+                recording_prompt_message = Message(
+                    session_id=UUID(session_id),
+                    role="assistant",
+                    content=response_text,
+                    message_type="recording_prompt",
+                    meta={"question": question}
+                )
+                db.add(recording_prompt_message)
+                db.commit()
                 await websocket.send_json({
                     "type": "recording_start",
                     "content": response_text,
@@ -422,18 +459,35 @@ async def websocket_endpoint(
                 feedback = result.get("feedback", {})
                 asset_id = result.get("asset_id")
                 audio_file_id = result.get("audio_file_id")
+
+                # 更新对应的 recording_prompt 消息为已提交状态
+                recording_prompt_msg = db.query(Message).filter(
+                    Message.session_id == UUID(session_id),
+                    Message.message_type == "recording_prompt"
+                ).order_by(Message.created_at.desc()).first()
+                if recording_prompt_msg:
+                    meta = recording_prompt_msg.meta or {}
+                    meta["submitted"] = True
+                    recording_prompt_msg.meta = meta
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(recording_prompt_msg, "meta")
+
+                # 使用 raw_content 作为消息内容
+                feedback_content = feedback.get("raw_content", "分析完成")
                 feedback_message = Message(
                     session_id=UUID(session_id),
                     role="assistant",
-                    content=f"STAR分析完成，总分：{feedback.get('overall_score', 0)}分",
+                    content=feedback_content,
                     message_type="feedback",
                     feedback=feedback,
                     meta={"question": new_question, "asset_id": asset_id, "audio_file_id": audio_file_id}
                 )
                 db.add(feedback_message)
                 db.commit()
+                # 发送流式结束消息（流式内容已通过回调发送）
                 await websocket.send_json({
-                    "type": "feedback",
+                    "type": "feedback_stream_end",
+                    "full_content": feedback_content,
                     "feedback": feedback,
                     "asset_id": asset_id,
                     "agent_status": {"current_agent": None, "status": "idle"},
@@ -594,6 +648,24 @@ async def websocket_endpoint(
                     "content": "已取消练习。有什么其他可以帮助你的吗？",
                     "timestamp": datetime.now().isoformat()
                 })
+                continue
+
+            elif message_type == "cancel_recording":
+                # 标记最近的未提交 recording_prompt 消息为已取消
+                recording_prompt_msg = db.query(Message).filter(
+                    Message.session_id == UUID(session_id),
+                    Message.message_type == "recording_prompt"
+                ).order_by(Message.created_at.desc()).first()
+
+                if recording_prompt_msg:
+                    meta = recording_prompt_msg.meta or {}
+                    if not meta.get("submitted"):  # 只有未提交的才能取消
+                        meta["cancelled"] = True
+                        recording_prompt_msg.meta = meta
+                        from sqlalchemy.orm.attributes import flag_modified
+                        flag_modified(recording_prompt_msg, "meta")
+                        db.commit()
+                        logger.info(f"Recording cancelled for message {recording_prompt_msg.id}")
                 continue
 
             elif message_type == "cancel":

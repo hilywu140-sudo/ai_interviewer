@@ -11,18 +11,21 @@ export function Avatar({ type, size = 'md' }: AvatarProps) {
 
   if (type === 'user') {
     return (
-      <div className={`${sizeClasses} rounded-full bg-ink-300 flex items-center justify-center flex-shrink-0`}>
-        <svg className={`${iconSize} text-cream-100`} viewBox="0 0 24 24" fill="currentColor">
+      <div className={`${sizeClasses} rounded-full bg-warm-300 flex items-center justify-center flex-shrink-0`}>
+        <svg className={`${iconSize} text-white`} viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
         </svg>
       </div>
     )
   }
 
+  // Assistant: 小机器人头像
   return (
     <div className={`${sizeClasses} rounded-full bg-warm-50 border border-warm-100 flex items-center justify-center flex-shrink-0`}>
       <svg className={`${iconSize} text-warm-300`} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        {/* 机器人图标：方脸+天线+眼睛 */}
+        <path d="M12 2a1 1 0 0 1 1 1v2h3a3 3 0 0 1 3 3v2a1 1 0 0 1-2 0V8a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v2a1 1 0 0 1-2 0V8a3 3 0 0 1 3-3h3V3a1 1 0 0 1 1-1Z"/>
+        <path d="M4 12a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6Zm5 2a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm6 0a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm-6 4h6a1 1 0 1 0 0-2H9a1 1 0 1 0 0 2Z"/>
       </svg>
     </div>
   )

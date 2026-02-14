@@ -242,13 +242,14 @@ class InterviewerSubAgent:
                 current_question=current_question
             )
 
-            # 6. STAR分析
-            logger.info("开始STAR分析...")
+            # 6. STAR分析（流式输出）
+            logger.info("开始STAR分析（流式）...")
             feedback = await self._analyze_answer(
                 question=current_question,
                 answer=transcript,
                 resume_text=resume_text,
-                jd_text=jd_text
+                jd_text=jd_text,
+                session_id=session_id
             )
 
             # 7. 自动保存到资产库
@@ -291,7 +292,7 @@ class InterviewerSubAgent:
                 "feedback": feedback,
                 "asset_id": asset_id,
                 "audio_file_id": audio_file_id,  # 新增：返回音频文件ID
-                "response_text": f"分析完成！总分：{feedback.get('overall_score', 0)}分",
+                "response_text": feedback.get("raw_content", "分析完成"),
                 "response_type": "feedback",
                 "response_metadata": {
                     "transcript": transcript,
@@ -320,13 +321,14 @@ class InterviewerSubAgent:
         question: str,
         answer: str,
         resume_text: str,
-        jd_text: str
+        jd_text: str,
+        session_id: str = None
     ) -> Dict[str, Any]:
         """
-        使用STAR框架分析回答
+        使用STAR框架分析回答（流式输出）
 
         Returns:
-            STAR分析结果
+            STAR分析结果（XML格式解析）
         """
         prompt = STAR_ANALYSIS_PROMPT.format(
             question=question,
@@ -340,46 +342,80 @@ class InterviewerSubAgent:
             {"role": "user", "content": prompt}
         ]
 
-        response = await llm_service.chat_completion(
-            messages=messages,
-            temperature=0.3
-        )
+        # 如果有 session_id，使用流式输出
+        if session_id:
+            from services.callback_registry import invoke_callback
 
-        # 解析JSON响应
-        try:
-            response_text = response.strip()
-            if response_text.startswith("```json"):
-                response_text = response_text[7:]
-            if response_text.startswith("```"):
-                response_text = response_text[3:]
-            if response_text.endswith("```"):
-                response_text = response_text[:-3]
+            # 发送流式开始消息
+            await invoke_callback(
+                session_id=session_id,
+                callback_name="on_feedback_stream_start"
+            )
 
-            result = json.loads(response_text.strip())
-            return self._normalize_feedback(result)
-        except json.JSONDecodeError as e:
-            logger.warning(f"STAR分析JSON解析失败: {e}")
-            return self._get_default_feedback(response)
+            full_content = ""
+            async for chunk in llm_service.chat_completion_stream(
+                messages=messages,
+                temperature=0.3
+            ):
+                full_content += chunk
+                # 发送流式 chunk
+                await invoke_callback(
+                    session_id=session_id,
+                    callback_name="on_feedback_chunk",
+                    content=chunk
+                )
 
-    def _normalize_feedback(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """标准化反馈结果"""
-        return {
-            "analysis": result.get("analysis", ""),
-            "overall_score": result.get("overall_score", 0),
-            "strengths": result.get("strengths", []),
-            "improvements": result.get("improvements", []),
-            "suggested_answer": result.get("suggested_answer", "")
+            # 发送流式结束消息
+            feedback = self._parse_xml_feedback(full_content)
+            await invoke_callback(
+                session_id=session_id,
+                callback_name="on_feedback_stream_end",
+                full_content=full_content,
+                feedback=feedback
+            )
+
+            return feedback
+        else:
+            # 非流式输出（用于测试）
+            response = await llm_service.chat_completion(
+                messages=messages,
+                temperature=0.3
+            )
+            return self._parse_xml_feedback(response)
+
+    def _parse_xml_feedback(self, response: str) -> Dict[str, Any]:
+        """解析 XML 格式的反馈"""
+        import re
+
+        result = {
+            "analysis": "",
+            "strengths": "",
+            "improvements": "",
+            "encouragement": "",
+            "raw_content": response  # 保存原始内容用于前端渲染
         }
 
-    def _get_default_feedback(self, raw_response: str) -> Dict[str, Any]:
-        """返回默认反馈"""
-        return {
-            "analysis": f"分析结果解析失败，原始响应：{raw_response[:500]}",
-            "overall_score": 50,
-            "strengths": ["回答已收到"],
-            "improvements": ["建议重新尝试以获得更准确的分析"],
-            "suggested_answer": ""
-        }
+        # 解析 <analysis> 标签
+        analysis_match = re.search(r'<analysis>([\s\S]*?)</analysis>', response)
+        if analysis_match:
+            result["analysis"] = analysis_match.group(1).strip()
+
+        # 解析 <strengths> 标签
+        strengths_match = re.search(r'<strengths>([\s\S]*?)</strengths>', response)
+        if strengths_match:
+            result["strengths"] = strengths_match.group(1).strip()
+
+        # 解析 <improvements> 标签
+        improvements_match = re.search(r'<improvements>([\s\S]*?)</improvements>', response)
+        if improvements_match:
+            result["improvements"] = improvements_match.group(1).strip()
+
+        # 解析 <encouragement> 标签
+        encouragement_match = re.search(r'<encouragement>([\s\S]*?)</encouragement>', response)
+        if encouragement_match:
+            result["encouragement"] = encouragement_match.group(1).strip()
+
+        return result
 
 
 # 全局实例

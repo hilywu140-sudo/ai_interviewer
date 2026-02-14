@@ -32,7 +32,7 @@ interface UseChatReturn {
   }
   sendMessage: (content: string, context?: MessageContext) => void
   setMessageContext: (context: MessageContext | null) => void
-  submitAudio: (audioData: string) => void
+  submitAudio: (audioData: string, previewUrl?: string) => void
   startRecording: () => void
   stopRecording: () => void
   cancelRecording: () => void
@@ -69,9 +69,16 @@ export function useChat(sessionId: string): UseChatReturn {
   const [historyLoaded, setHistoryLoaded] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
+  // 录音本地预览URL（提交录音后保留，用于在消息中显示播放器）
+  const audioPreviewUrlRef = useRef<string | null>(null)
+
   // 流式消息状态
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingContent, setStreamingContent] = useState('')
+
+  // 流式反馈状态
+  const [isFeedbackStreaming, setIsFeedbackStreaming] = useState(false)
+  const [feedbackStreamingContent, setFeedbackStreamingContent] = useState('')
 
   // 项目ID（从session获取）
   const [projectId, setProjectId] = useState<string | null>(null)
@@ -122,6 +129,14 @@ export function useChat(sessionId: string): UseChatReturn {
       transcription: msg.transcript,
       audioFileId: msg.audio_file_id,
       isCancelled: msg.meta?.cancelled === true,  // 检查是否是被取消的消息
+      transcriptSentences: msg.meta?.transcript_sentences,  // 从 meta 中读取带时间戳的录音稿
+    }
+
+    // 处理 recording_prompt 类型消息
+    if (msg.message_type === 'recording_prompt') {
+      chatMsg.question = msg.meta?.question
+      chatMsg.isRecordingSubmitted = msg.meta?.submitted === true
+      chatMsg.isRecordingCancelled = msg.meta?.cancelled === true
     }
 
     // 从 meta 中恢复保存状态
@@ -361,12 +376,13 @@ export function useChat(sessionId: string): UseChatReturn {
               transcription: message.transcription?.text,
               transcriptSentences: message.transcript_sentences,  // 带时间戳的句子
               audioFileId: message.audio_file_id,  // 音频文件ID
+              audioUrl: audioPreviewUrlRef.current || undefined,  // 先用本地预览URL
               timestamp: message.timestamp
             }
-            console.log('>>> 添加用户语音消息:', userVoiceMsgId)
+            console.log('>>> 添加用户语音消息:', userVoiceMsgId, 'previewUrl:', !!audioPreviewUrlRef.current)
             setMessages((prev) => [...prev, userVoiceMsg])
 
-            // 如果有音频文件ID，获取签名URL
+            // 如果有音频文件ID，获取服务端签名URL替换本地预览
             if (message.audio_file_id) {
               audioApi.getUrl(message.audio_file_id)
                 .then(({ url }) => {
@@ -381,6 +397,40 @@ export function useChat(sessionId: string): UseChatReturn {
           }
           break
 
+        // 流式反馈消息处理
+        case 'feedback_stream_start':
+          console.log('>>> 收到 feedback_stream_start 消息')
+          setIsFeedbackStreaming(true)
+          setFeedbackStreamingContent('')
+          setAgentStatus('idle')  // 流式开始后停止3点动画
+          break
+
+        case 'feedback_chunk':
+          setFeedbackStreamingContent(prev => prev + (message.content || ''))
+          break
+
+        case 'feedback_stream_end':
+          console.log('>>> 收到 feedback_stream_end 消息:', message.timestamp)
+          setIsFeedbackStreaming(false)
+          setFeedbackStreamingContent('')
+          setAgentStatus('idle')
+          setRecordingState(initialRecordingState)
+          setTranscription(initialTranscriptionState)
+          setIsSubmitted(false)
+
+          // 添加反馈消息
+          const feedbackStreamEndMsg: ChatMessage = {
+            id: generateMessageId(),
+            role: 'assistant',
+            content: message.full_content || feedbackStreamingContent || '分析完成',
+            type: 'feedback',
+            feedback: message.feedback,
+            assetId: message.asset_id,
+            timestamp: message.timestamp
+          }
+          setMessages((prev) => [...prev, feedbackStreamEndMsg])
+          break
+
         case 'feedback':
           console.log('>>> 收到 feedback 消息:', message.timestamp)
           setAgentStatus('idle')
@@ -388,15 +438,14 @@ export function useChat(sessionId: string): UseChatReturn {
           setTranscription(initialTranscriptionState)
           setIsSubmitted(false)  // 重置提交状态
 
-          // 添加反馈消息（不再包含转录相关字段，因为已在用户消息中显示）
+          // 添加反馈消息（使用 XML 格式的 content）
           const feedbackMsg: ChatMessage = {
             id: generateMessageId(),
             role: 'assistant',
-            content: 'STAR分析结果',
+            content: message.content || message.feedback?.raw_content || '分析完成',
             type: 'feedback',
             feedback: message.feedback,
             assetId: message.asset_id,
-            // 不再传递: transcription, transcriptSentences, audioFileId, audioUrl
             timestamp: message.timestamp
           }
 
@@ -517,7 +566,7 @@ export function useChat(sessionId: string): UseChatReturn {
   }, [messageContext])
 
   // 提交音频
-  const submitAudio = useCallback((audioData: string) => {
+  const submitAudio = useCallback((audioData: string, previewUrl?: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const timestamp = new Date().toISOString()
 
@@ -526,6 +575,9 @@ export function useChat(sessionId: string): UseChatReturn {
         audio_data: audioData,
         timestamp
       }))
+
+      // 保存本地预览URL
+      audioPreviewUrlRef.current = previewUrl || null
 
       // 停止录音计时器
       if (recordingTimerRef.current) {
@@ -538,6 +590,14 @@ export function useChat(sessionId: string): UseChatReturn {
         ...prev,
         isRecording: false
       }))
+
+      // 更新 recording_prompt 消息的提交状态（排除已取消的）
+      setMessages((prev) => prev.map(msg =>
+        msg.type === 'recording_prompt' && !msg.isRecordingSubmitted && !msg.isRecordingCancelled
+          ? { ...msg, isRecordingSubmitted: true }
+          : msg
+      ))
+
       setIsSubmitted(true)  // 设置为已提交状态
       setAgentStatus('transcribing')
     }
@@ -580,6 +640,21 @@ export function useChat(sessionId: string): UseChatReturn {
       recordingTimerRef.current = null
     }
 
+    // 发送取消录音消息到后端（持久化）
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'cancel_recording',
+        timestamp: new Date().toISOString()
+      }))
+    }
+
+    // 立即更新前端状态
+    setMessages(prev => prev.map(msg =>
+      msg.type === 'recording_prompt' && !msg.isRecordingSubmitted && !msg.isRecordingCancelled
+        ? { ...msg, isRecordingCancelled: true }
+        : msg
+    ))
+
     setRecordingState(initialRecordingState)
     setAgentStatus('idle')
   }, [])
@@ -618,6 +693,8 @@ export function useChat(sessionId: string): UseChatReturn {
     isSubmitted,  // 新增
     isStreaming,  // 新增：流式状态
     streamingContent,  // 新增：流式内容
+    isFeedbackStreaming,  // 新增：流式反馈状态
+    feedbackStreamingContent,  // 新增：流式反馈内容
     projectId,  // 新增：项目ID
     pendingQuery,  // 新增：待恢复的用户输入
     messageContext,  // 新增：消息上下文

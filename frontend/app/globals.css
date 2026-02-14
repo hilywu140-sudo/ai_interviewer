@@ -8,11 +8,11 @@ html {
 }
 
 ::selection {
-  background: #F0E6CC;
-  color: #1A1A1A;
+  background: #DBEAFE;
+  color: #1E293B;
 }
 
-/* ─── Custom scrollbar (thin, warm) ─── */
+/* ─── Custom scrollbar (thin, trust blue) ─── */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -23,31 +23,40 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D4CFC4;
+  background: #CBD5E1;
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #8B6914;
+  background: #3B82F6;
 }
 
-/* ─── Prose warm (for AI chat messages) ─── */
+/* ─── Prose trust (for AI chat messages) ─── */
 .prose-warm {
-  --tw-prose-body: #4A4A4A;
-  --tw-prose-headings: #1A1A1A;
-  --tw-prose-lead: #6B6B6B;
-  --tw-prose-links: #8B6914;
-  --tw-prose-bold: #1A1A1A;
-  --tw-prose-counters: #6B6B6B;
-  --tw-prose-bullets: #D4CFC4;
-  --tw-prose-hr: #E8E5DE;
-  --tw-prose-quotes: #333333;
-  --tw-prose-quote-borders: #D4B96A;
-  --tw-prose-code: #1A1A1A;
-  --tw-prose-pre-code: #F5F3ED;
-  --tw-prose-pre-bg: #1A1A1A;
-  --tw-prose-th-borders: #E8E5DE;
-  --tw-prose-td-borders: #F5F3ED;
+  --tw-prose-body: #475569;
+  --tw-prose-headings: #1E293B;
+  --tw-prose-lead: #64748B;
+  --tw-prose-links: #3B82F6;
+  --tw-prose-bold: #1E293B;
+  --tw-prose-counters: #64748B;
+  --tw-prose-bullets: #CBD5E1;
+  --tw-prose-hr: #CBD5E1;
+  --tw-prose-quotes: #334155;
+  --tw-prose-quote-borders: #60A5FA;
+  --tw-prose-code: #1E293B;
+  --tw-prose-pre-code: #E2E8F0;
+  --tw-prose-pre-bg: #1E293B;
+  --tw-prose-th-borders: #CBD5E1;
+  --tw-prose-td-borders: #E2E8F0;
+}
+
+/* ─── Chat bubble shapes (asymmetric radius for tail effect) ─── */
+.bubble-user {
+  border-radius: 20px;
+}
+
+.bubble-assistant {
+  border-radius: 20px;
 }
 
 /* ─── Prose heading & paragraph spacing ─── */
@@ -87,13 +96,34 @@ html {
   @apply my-5 border-cream-300;
 }
 
+/* ─── Date separator (conversation flow) ─── */
+.date-separator {
+  @apply flex items-center gap-3 my-6;
+}
+.date-separator::before,
+.date-separator::after {
+  content: '';
+  @apply flex-1 h-px bg-cream-200;
+}
+
+/* ─── Streaming cursor (thin blinking bar) ─── */
+.streaming-cursor {
+  @apply inline-block w-0.5 h-4 ml-0.5 bg-warm-300 rounded-full;
+  animation: cursor-blink 1s ease-in-out infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* ─── Input focus ring override ─── */
 input:focus,
 textarea:focus {
   outline: none;
 }
 
-/* ─── Warm bounce animation for status dots ─── */
+/* ─── Trust blue bounce animation for status dots ─── */
 @keyframes warm-bounce {
   0%, 80%, 100% {
     transform: scale(0);

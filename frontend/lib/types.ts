@@ -97,10 +97,10 @@ export interface SessionCreate {
 
 export interface PracticeFeedback {
   analysis: string
-  overall_score: number
-  strengths: string[]
-  improvements: string[]
-  // suggested_answer 已移除
+  strengths: string
+  improvements: string
+  encouragement: string
+  raw_content: string  // 原始 XML 内容
 }
 
 // ============ 逐字稿时间戳相关 ============
@@ -266,6 +266,9 @@ export interface ChatMessage {
   // 保存相关
   pendingSave?: PendingSave | null   // 该消息的待保存数据
   saveStatus?: 'unsaved' | 'saved'   // 保存状态
+  // 录音提交状态
+  isRecordingSubmitted?: boolean     // 录音是否已提交
+  isRecordingCancelled?: boolean     // 录音是否已取消
 }
 
 // 录音状态

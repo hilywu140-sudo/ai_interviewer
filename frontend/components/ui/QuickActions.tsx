@@ -1,5 +1,7 @@
 'use client'
 
+import { useState, useEffect } from 'react'
+
 interface QuickAction {
   id: string
   label: string
@@ -10,6 +12,7 @@ interface QuickAction {
 interface QuickActionsProps {
   onSelect: (prompt: string) => void
   disabled?: boolean
+  resetTrigger?: number  // 递增时重置选中状态
 }
 
 const quickActions: QuickAction[] = [
@@ -76,29 +79,50 @@ const quickActions: QuickAction[] = [
   }
 ]
 
-export function QuickActions({ onSelect, disabled = false }: QuickActionsProps) {
+export function QuickActions({ onSelect, disabled = false, resetTrigger }: QuickActionsProps) {
+  const [activeId, setActiveId] = useState<string | null>(null)
+
+  // 当 resetTrigger 变化时（消息发送后），重置选中状态
+  useEffect(() => {
+    if (resetTrigger !== undefined) {
+      setActiveId(null)
+    }
+  }, [resetTrigger])
+
+  const handleClick = (action: QuickAction) => {
+    if (disabled) return
+    // 切换选中状态：再次点击同一个按钮则取消选中
+    const newId = activeId === action.id ? null : action.id
+    setActiveId(newId)
+    onSelect(action.prompt)
+  }
+
   return (
-    <div className="flex flex-wrap gap-2 px-4 py-3">
-      {quickActions.map((action) => (
-        <button
-          key={action.id}
-          onClick={() => onSelect(action.prompt)}
-          disabled={disabled}
-          className={`
-            inline-flex items-center gap-1.5 px-4 py-2
-            text-sm bg-cream-200 text-ink-100
-            rounded-full border-0
-            transition-all duration-200
-            ${disabled
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-warm-50 hover:text-warm-400'
-            }
-          `}
-        >
-          <span className="text-cream-400 group-hover:text-warm-300">{action.icon}</span>
-          <span>{action.label}</span>
-        </button>
-      ))}
+    <div className="flex flex-wrap justify-center gap-2 px-4 py-3">
+      {quickActions.map((action) => {
+        const isActive = activeId === action.id
+        return (
+          <button
+            key={action.id}
+            onClick={() => handleClick(action)}
+            disabled={disabled}
+            className={`
+              inline-flex items-center gap-1.5 px-4 py-2
+              text-sm rounded-full border
+              transition-all duration-200
+              ${disabled
+                ? 'opacity-50 cursor-not-allowed bg-white text-ink-100 border-cream-300'
+                : isActive
+                  ? 'bg-warm-300 text-white border-warm-300 shadow-subtle'
+                  : 'bg-white text-ink-100 border-cream-300 hover:bg-warm-50 hover:text-warm-400 hover:border-warm-200 hover:shadow-subtle hover:-translate-y-0.5'
+              }
+            `}
+          >
+            <span className={isActive ? 'text-white/80' : 'text-cream-400'}>{action.icon}</span>
+            <span>{action.label}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }

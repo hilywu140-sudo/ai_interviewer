@@ -38,6 +38,8 @@ export default function ChatPage() {
     isSubmitted,
     isStreaming,
     streamingContent,
+    isFeedbackStreaming,
+    feedbackStreamingContent,
     projectId,
     pendingQuery,
     messageContext,
@@ -46,6 +48,9 @@ export default function ChatPage() {
 
   // 侧边栏状态
   const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+
+  // 当前会话标题（从侧边栏获取）
+  const [currentSessionTitle, setCurrentSessionTitle] = useState('')
 
   // 编辑弹窗状态
   const [editingAsset, setEditingAsset] = useState<{ assetId: string; content: string } | null>(null)
@@ -140,7 +145,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex h-screen bg-cream-100">
+    <div className="flex h-screen bg-white">
       {/* 侧边栏 */}
       {projectId && (
         <ChatSidebar
@@ -151,6 +156,7 @@ export default function ChatPage() {
           onFillInput={handleFillInput}
           onSelectAsset={(asset) => setSelectedAsset(asset)}
           onSessionChange={handleSessionChange}
+          onCurrentSessionTitle={setCurrentSessionTitle}
           newAssetId={newAssetId}
           onNewAssetShown={clearNewAssetId}
           refreshKey={sidebarRefreshKey}
@@ -163,6 +169,7 @@ export default function ChatPage() {
         <ChatHeader
           isConnected={isConnected}
           agentStatus={agentStatus}
+          sessionTitle={currentSessionTitle}
           onBack={handleBack}
           onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
           isSidebarOpen={isSidebarOpen}
@@ -176,6 +183,8 @@ export default function ChatPage() {
           isSubmitted={isSubmitted}
           isStreaming={isStreaming}
           streamingContent={streamingContent}
+          isFeedbackStreaming={isFeedbackStreaming}
+          feedbackStreamingContent={feedbackStreamingContent}
           onStartRecording={startRecording}
           onStopRecording={stopRecording}
           onCancelRecording={cancelRecording}

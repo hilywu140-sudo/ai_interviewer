@@ -10,7 +10,7 @@ interface RecordingCardProps {
   onStartRecording: () => void
   onStopRecording: () => void
   onCancelRecording: () => void
-  onSubmitAudio: (audioData: string) => void
+  onSubmitAudio: (audioData: string, previewUrl?: string) => void
 }
 
 export function RecordingCard({
@@ -95,9 +95,8 @@ export function RecordingCard({
     reader.onloadend = () => {
       const base64 = reader.result as string
       const base64Data = base64.split(',')[1]
-      onSubmitAudio(base64Data)
-      setAudioBlob(null)
-      setPreviewUrl(null)
+      onSubmitAudio(base64Data, previewUrl || undefined)
+      // 不清除 audioBlob/previewUrl，让 isSubmitted 控制 UI 显示"等待分析"
     }
     reader.readAsDataURL(audioBlob)
   }
@@ -138,7 +137,7 @@ export function RecordingCard({
     <div className="bg-cream-50 border border-cream-300 rounded-card shadow-card overflow-hidden">
       {/* 问题显示 */}
       <div className="bg-warm-50 px-5 py-4 border-b border-warm-100">
-        <div className="flex items-center gap-2 text-warm-400 text-sm font-serif mb-1">
+        <div className="flex items-center gap-2 text-warm-400 text-sm font-medium mb-1">
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
           </svg>
@@ -151,17 +150,21 @@ export function RecordingCard({
       <div className="p-5">
         {/* 状态0: 已提交，等待分析 */}
         {isSubmitted && (
-          <div className="space-y-4">
+          <div className="space-y-3">
+            {/* 显示录音预览（如果有） */}
+            {previewUrl && (
+              <div className="bg-cream-200/50 rounded-card p-3">
+                <audio
+                  src={previewUrl}
+                  controls
+                  className="w-full"
+                />
+              </div>
+            )}
             <div className="flex items-center justify-center gap-3 py-4">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-warm-300" />
-              <span className="text-ink-50 font-light">正在分析您的回答...</span>
+              <span className="text-ink-50 font-light">已完成练习，等待分析...</span>
             </div>
-            <button
-              onClick={handleCancelRecording}
-              className="w-full text-cream-400 hover:text-ink-100 text-sm py-2 border border-cream-300 rounded-button hover:bg-cream-200 transition-all"
-            >
-              取消
-            </button>
           </div>
         )}
 
@@ -169,7 +172,7 @@ export function RecordingCard({
         {!isSubmitted && !recordingState.isRecording && !audioBlob && (
           <button
             onClick={handleStartRecording}
-            className="w-full flex items-center justify-center gap-3 bg-ink-300 hover:bg-ink-200 text-cream-50 rounded-button py-4 transition-all duration-300"
+            className="w-full flex items-center justify-center gap-3 bg-warm-300 hover:bg-warm-400 text-white rounded-button py-4 transition-all duration-300"
           >
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8a1 1 0 10-2 0A5 5 0 015 8a1 1 0 00-2 0 7.001 7.001 0 006 6.93V17H6a1 1 0 100 2h8a1 1 0 100-2h-3v-2.07z" clipRule="evenodd" />
@@ -188,7 +191,7 @@ export function RecordingCard({
                   {isPaused ? '已暂停' : '录音中'}
                 </span>
               </div>
-              <span className="text-2xl font-display text-ink-200">
+              <span className="text-2xl font-bold tabular-nums text-ink-200">
                 {formatDuration(recordingState.duration)}
               </span>
             </div>

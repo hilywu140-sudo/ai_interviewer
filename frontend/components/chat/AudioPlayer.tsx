@@ -126,7 +126,7 @@ export function AudioPlayer({ src, className = '' }: AudioPlayerProps) {
       {/* 播放/暂停按钮 */}
       <button
         onClick={togglePlay}
-        className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+        className="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-warm-300 hover:bg-warm-400 transition-colors text-white"
       >
         {isPlaying ? (
           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
@@ -141,29 +141,29 @@ export function AudioPlayer({ src, className = '' }: AudioPlayerProps) {
 
       {/* 进度条 */}
       <div className="flex-1 flex items-center gap-2">
-        <span className="text-xs opacity-80 w-10 text-center">
+        <span className="text-xs text-warm-400 w-10 text-center tabular-nums">
           {formatTime(currentTime)}
         </span>
 
         <div
           ref={progressRef}
-          className="flex-1 h-2 bg-white/20 rounded-full cursor-pointer relative"
+          className="flex-1 h-2 bg-warm-200/50 rounded-full cursor-pointer relative"
           onClick={handleProgressClick}
           onMouseDown={handleMouseDown}
         >
           {/* 已播放进度 */}
           <div
-            className="absolute top-0 left-0 h-full bg-white rounded-full transition-all"
+            className="absolute top-0 left-0 h-full bg-warm-400 rounded-full transition-all"
             style={{ width: `${progress}%` }}
           />
           {/* 拖动手柄 */}
           <div
-            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md transition-all"
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow-md ring-2 ring-warm-300 transition-all"
             style={{ left: `calc(${progress}% - 6px)` }}
           />
         </div>
 
-        <span className="text-xs opacity-80 w-10 text-center">
+        <span className="text-xs text-warm-400 w-10 text-center tabular-nums">
           {formatTime(duration)}
         </span>
       </div>

@@ -28,7 +28,9 @@
       "Bash(cat:*)",
       "Bash(curl:*)",
       "Bash(npx next build:*)",
-      "Skill(frontend-design)"
+      "Skill(frontend-design)",
+      "Bash(python3:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

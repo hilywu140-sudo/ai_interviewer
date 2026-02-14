@@ -20,11 +20,11 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
       <div className="px-6 py-5 border-b border-cream-300">
         <div className="flex justify-between items-center">
           <div>
-            <h3 className="font-serif text-lg text-ink-300">面试回答分析</h3>
+            <h3 className="font-semibold text-lg text-ink-300">面试回答分析</h3>
             <p className="text-xs text-cream-400 mt-0.5 font-light">基于 STAR 框架的专业评估</p>
           </div>
           <div className="text-center">
-            <div className="font-display text-5xl text-warm-300">
+            <div className="text-5xl font-bold tabular-nums text-warm-300">
               {overall_score}
             </div>
             <div className="text-xs text-cream-400 mt-1 font-light">总分</div>
@@ -47,7 +47,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
         {/* 详细分析 */}
         {analysis && (
           <div>
-            <h4 className="font-serif text-sm text-ink-200 mb-3 flex items-center gap-2">
+            <h4 className="font-medium text-sm text-ink-200 mb-3 flex items-center gap-2">
               <svg className="w-4 h-4 text-warm-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
@@ -62,7 +62,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
         {/* 优点 */}
         {strengths.length > 0 && (
           <div>
-            <h4 className="font-serif text-sm text-sage-300 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-sm text-sage-300 mb-2 flex items-center gap-2">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
@@ -82,7 +82,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
         {/* 改进建议 */}
         {improvements.length > 0 && (
           <div>
-            <h4 className="font-serif text-sm text-warm-300 mb-2 flex items-center gap-2">
+            <h4 className="font-medium text-sm text-warm-300 mb-2 flex items-center gap-2">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>

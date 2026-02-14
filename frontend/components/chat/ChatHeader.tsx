@@ -20,7 +20,7 @@ export function ChatHeader({
   isSidebarOpen
 }: ChatHeaderProps) {
   return (
-    <header className="bg-cream-50 shadow-subtle px-4 py-3 flex items-center justify-between">
+    <header className="bg-white border-b border-cream-200 px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {/* 侧边栏切换按钮 */}
         {onToggleSidebar && (
@@ -50,8 +50,8 @@ export function ChatHeader({
             </svg>
           </button>
         )}
-        <h1 className="font-serif text-base text-ink-300">
-          {sessionTitle || 'AI 面试助手'}
+        <h1 className="font-sans font-semibold text-base text-ink-300">
+          {sessionTitle || '加载中...'}
         </h1>
       </div>
 
@@ -65,7 +65,7 @@ export function ChatHeader({
 
         {/* Agent 状态 */}
         {agentStatus !== 'idle' && (
-          <div className="flex items-center gap-2 text-xs text-cream-400">
+          <div className="flex items-center gap-2 text-xs text-warm-400 bg-warm-50 px-3 py-1 rounded-full">
             <ThinkingDots />
             <span className="font-light">{getStatusText(agentStatus)}</span>
           </div>
@@ -94,9 +94,9 @@ function getStatusText(status: AgentStatus): string {
 function ThinkingDots() {
   return (
     <div className="flex items-center gap-1">
-      <span className="w-1.5 h-1.5 bg-warm-200 rounded-full animate-warm-bounce" />
-      <span className="w-1.5 h-1.5 bg-warm-200 rounded-full animate-warm-bounce animate-warm-bounce-delay-1" />
-      <span className="w-1.5 h-1.5 bg-warm-200 rounded-full animate-warm-bounce animate-warm-bounce-delay-2" />
+      <span className="w-1.5 h-1.5 bg-warm-300 rounded-full animate-warm-bounce" />
+      <span className="w-1.5 h-1.5 bg-warm-300 rounded-full animate-warm-bounce animate-warm-bounce-delay-1" />
+      <span className="w-1.5 h-1.5 bg-warm-300 rounded-full animate-warm-bounce animate-warm-bounce-delay-2" />
     </div>
   )
 }

@@ -29,6 +29,7 @@ export function ChatInput({
 }: ChatInputProps) {
   const [internalInput, setInternalInput] = useState('')
   const [showHint, setShowHint] = useState(false)
+  const [quickActionResetTrigger, setQuickActionResetTrigger] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // 支持受控和非受控模式
@@ -69,6 +70,7 @@ export function ChatInput({
       onSendMessage(trimmed)
       setInput('')
       setShowHint(false)
+      setQuickActionResetTrigger(prev => prev + 1)
     }
   }
 
@@ -121,16 +123,18 @@ export function ChatInput({
     : input.trim().length > 0
 
   return (
-    <div className="bg-cream-50">
-      {/* 快捷按钮 */}
-      <QuickActions onSelect={handleQuickAction} disabled={disabled} />
+    <div className="bg-white">
+      {/* 输入区域 - 居中 */}
+      <div className="flex flex-col items-center px-4 pb-4">
+        {/* 快捷按钮 - 居中对齐 */}
+        <div className="w-full max-w-2xl">
+          <QuickActions onSelect={handleQuickAction} disabled={disabled} resetTrigger={quickActionResetTrigger} />
+        </div>
 
-      {/* 输入区域 */}
-      <div className="px-4 pb-4">
-        <div className="relative">
+        <div className="relative w-full max-w-2xl">
           {/* 上下文提示条（带取消按钮） */}
           {messageContext && (
-            <div className="flex items-center justify-between bg-warm-50 border border-warm-100 rounded-t-[12px] px-3 py-2 border-b-0">
+            <div className="flex items-center justify-between bg-warm-50 border border-warm-100 border-l-[3px] border-l-warm-300 rounded-t-[12px] px-3 py-2 border-b-0">
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-warm-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -158,8 +162,7 @@ export function ChatInput({
             </p>
           )}
 
-          <div className="flex items-end gap-3">
-            <div className="flex-1 relative">
+          <div className="relative">
               <textarea
                 ref={textareaRef}
                 value={input}
@@ -168,42 +171,40 @@ export function ChatInput({
                 placeholder={placeholder}
                 disabled={disabled}
                 rows={1}
-                className={`w-full resize-none bg-cream-100 border-0 px-4 py-3
+                className={`w-full resize-none bg-white border border-cream-200 focus:border-warm-200 pl-4 pr-12 py-3
                            focus:ring-1 focus:ring-warm-200
                            disabled:bg-cream-200 disabled:cursor-not-allowed disabled:text-cream-400
                            text-sm text-ink-300 placeholder-cream-400
-                           ${messageContext ? 'rounded-b-[12px] rounded-t-none' : 'rounded-[12px]'}`}
+                           ${messageContext ? 'rounded-b-[20px] rounded-t-none' : 'rounded-[20px]'}`}
                 style={{ minHeight: '48px', maxHeight: '120px' }}
               />
+              {/* 发送/停止按钮 - 在输入框内部右侧 */}
+              {showStopButton ? (
+                <button
+                  onClick={onStop}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-rose-300 hover:bg-rose-200
+                             text-cream-50 transition-all duration-200
+                             flex items-center justify-center"
+                >
+                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                    <rect x="6" y="6" width="12" height="12" rx="1" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  onClick={handleSend}
+                  disabled={disabled || !canSend}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-warm-300 hover:bg-warm-400
+                             disabled:bg-cream-300 disabled:cursor-not-allowed
+                             text-cream-50 transition-all duration-200
+                             flex items-center justify-center"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                  </svg>
+                </button>
+              )}
             </div>
-
-            {/* 停止按钮 */}
-            {showStopButton ? (
-              <button
-                onClick={onStop}
-                className="flex-shrink-0 w-10 h-10 rounded-full bg-rose-300 hover:bg-rose-200
-                           text-cream-50 transition-all duration-200
-                           flex items-center justify-center"
-              >
-                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                  <rect x="6" y="6" width="12" height="12" rx="1" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                onClick={handleSend}
-                disabled={disabled || !canSend}
-                className="flex-shrink-0 w-10 h-10 rounded-full bg-ink-300 hover:bg-ink-200
-                           disabled:bg-cream-300 disabled:cursor-not-allowed
-                           text-cream-50 transition-all duration-200
-                           flex items-center justify-center"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                </svg>
-              </button>
-            )}
-          </div>
         </div>
       </div>
     </div>
