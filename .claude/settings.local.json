@@ -17,7 +17,6 @@
       "Bash(npm install react-markdown remark-gfm)",
       "Bash(timeout 5 bash:*)",
       "Bash(npm run dev)",
-      "Bash(ffmpeg:*)",
       "Bash(export PATH:*)",
       "Bash(taskkill:*)",
       "Bash(tasklist:*)",
@@ -30,7 +29,10 @@
       "Bash(npx next build:*)",
       "Skill(frontend-design)",
       "Bash(python3:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "WebFetch(domain:www.alibabacloud.com)",
+      "WebFetch(domain:deepwiki.com)",
+      "WebFetch(domain:pypi.org)"
     ],
     "deny": [],
     "ask": []

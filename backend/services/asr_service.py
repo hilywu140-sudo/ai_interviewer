@@ -39,7 +39,7 @@ class ASRService:
     def __init__(self):
         dashscope.api_key = settings.dashscope_api_key
         dashscope.base_http_api_url = 'https://dashscope.aliyuncs.com/api/v1'
-        self.model = "fun-asr"
+        self.model = "paraformer-v2"
 
     def transcribe_audio_bytes_sync(
         self,
@@ -51,8 +51,8 @@ class ASRService:
         同步转录音频字节数据
 
         Args:
-            audio_data: WAV 音频字节数据
-            sample_rate: 采样率，默认 16000Hz
+            audio_data: 音频字节数据（支持 WebM、WAV、MP3 等格式）
+            sample_rate: 采样率，默认 16000Hz（paraformer-v2 自动处理）
             persist_audio: 是否持久化保存音频到 OSS（不删除）
 
         Returns:
@@ -65,17 +65,17 @@ class ASRService:
         oss_base_url = None
 
         try:
-            # 1. 上传音频到 OSS
+            # 1. 上传音频到 OSS（paraformer-v2 原生支持 WebM 格式，无需转换）
             logger.info(f"上传音频到 OSS，大小: {len(audio_data)} bytes, persist={persist_audio}")
 
             if persist_audio:
                 # 持久化上传（不会自动删除）
-                oss_key, oss_base_url = oss_service.upload_audio_persistent(audio_data, suffix='.wav')
+                oss_key, oss_base_url = oss_service.upload_audio_persistent(audio_data, suffix='.webm')
                 # 生成临时签名 URL 用于 ASR
                 audio_url = oss_service.get_signed_url(oss_key, 3600)
             else:
                 # 临时上传（转录后删除）
-                audio_url = oss_service.upload_audio(audio_data, suffix='.wav')
+                audio_url = oss_service.upload_audio(audio_data, suffix='.webm')
 
             logger.info(f"音频 URL: {audio_url[:80]}...")
 
@@ -83,7 +83,8 @@ class ASRService:
             logger.info("提交 ASR 转录任务...")
             task_response = Transcription.async_call(
                 model=self.model,
-                file_urls=[audio_url]
+                file_urls=[audio_url],
+                language_hints=['zh', 'en']  # paraformer-v2 专属参数
             )
 
             if not task_response.output or not task_response.output.task_id:
@@ -92,13 +93,16 @@ class ASRService:
             task_id = task_response.output.task_id
             logger.info(f"ASR 任务已提交，task_id: {task_id}")
 
-            # 3. 等待转录结果
+            # 3. 轮询等待转录结果
             logger.info("等待 ASR 转录结果...")
-            result = Transcription.wait(task=task_id)
+            while True:
+                if task_response.output.task_status in ['SUCCEEDED', 'FAILED']:
+                    break
+                task_response = Transcription.fetch(task=task_id)
 
-            if result.status_code == HTTPStatus.OK:
+            if task_response.status_code == HTTPStatus.OK:
                 # 解析转录结果
-                transcript, sentences = self._parse_result(result.output)
+                transcript, sentences = self._parse_result(task_response.output)
                 logger.info(f"ASR 转录完成: {transcript[:100] if transcript else '(空)'}...")
                 logger.info(f"ASR 句子数: {len(sentences)}")
 
@@ -110,7 +114,7 @@ class ASRService:
                 else:
                     return asr_result, None
             else:
-                error_msg = getattr(result, 'message', str(result))
+                error_msg = getattr(task_response, 'message', str(task_response))
                 raise Exception(f"ASR 转录失败: {error_msg}")
 
         except Exception as e:
@@ -217,10 +221,10 @@ class ASRService:
         异步转录音频字节数据（兼容现有接口）
 
         Args:
-            audio_data: WAV 音频字节数据
+            audio_data: 音频字节数据（支持 WebM、WAV、MP3 等格式）
             context_text: 上下文文本（暂未使用）
-            language: 语言代码（暂未使用）
-            sample_rate: 采样率
+            language: 语言代码（暂未使用，paraformer-v2 使用 language_hints）
+            sample_rate: 采样率（paraformer-v2 自动处理）
             persist_audio: 是否持久化保存音频到 OSS
             on_progress: 进度回调（暂未使用）
 

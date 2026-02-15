@@ -97,6 +97,7 @@ async def handle_stream_response(
                 break
 
             full_content += chunk
+            # 发送流式 chunk（不记录日志以减少噪音）
             await websocket.send_json({
                 "type": "assistant_message_chunk",
                 "content": chunk,
@@ -397,6 +398,7 @@ async def websocket_endpoint(
             })
 
         async def on_feedback_chunk_callback(content: str):
+            # 发送流式 chunk（不记录日志以减少噪音）
             await websocket.send_json({
                 "type": "feedback_chunk",
                 "content": content,

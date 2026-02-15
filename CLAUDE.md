@@ -378,8 +378,8 @@ UPDATE assets SET version_type = 'recording' WHERE version_type IS NULL;
 
 1. **ASR 服务架构变更**
    - 从 Recognition API（实时识别）切换到 Transcription API（录音文件转写）
-   - 使用 `fun-asr` 模型，支持更高质量的转录
-   - 音频格式：WebM → WAV（通过 ffmpeg 转换）
+   - 使用 `paraformer-v2` 模型，原生支持 WebM 格式
+   - 音频格式：WebM（无需转换）
 
 2. **新增 OSS 上传服务**
    - 创建 `services/oss_service.py` - 阿里云 OSS 文件上传
@@ -390,7 +390,7 @@ UPDATE assets SET version_type = 'recording' WHERE version_type IS NULL;
    ```
    前端录音 (WebM) → Base64 编码 → WebSocket 传输
        ↓
-   后端解码 → ffmpeg 转 WAV → OSS 上传 → 生成签名 URL
+   后端解码 → OSS 上传 → 生成签名 URL
        ↓
    Transcription.async_call() → 提交任务 → Transcription.wait() → 获取结果
        ↓
@@ -405,8 +405,7 @@ UPDATE assets SET version_type = 'recording' WHERE version_type IS NULL;
 
 5. **关键文件变更**
    - `services/oss_service.py` - **新建** OSS 上传服务
-   - `services/asr_service.py` - **重写** 使用 Transcription API
-   - `services/audio_converter.py` - **修改** 输出 WAV 格式
+   - `services/asr_service.py` - **重写** 使用 Transcription API，支持 WebM 原生格式
    - `agents/graph.py` - 添加 `current_question` 参数传递
    - `api/websocket.py` - 传递 `current_question` 到 LangGraph
 

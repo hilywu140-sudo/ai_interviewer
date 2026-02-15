@@ -12,7 +12,6 @@ from agents.state import AgentState
 from agents.prompts.interviewer import INTERVIEWER_SYSTEM_PROMPT, STAR_ANALYSIS_PROMPT
 from services.llm_service import llm_service
 from services.asr_service import asr_service, build_context_text
-from services.audio_converter import convert_audio_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -161,12 +160,18 @@ class InterviewerSubAgent:
             # 1. 解码音频
             audio_bytes = base64.b64decode(audio_data)
 
-            # 2. 转换音频格式（WebM -> PCM）
-            logger.info(f"原始音频大小: {len(audio_bytes)} bytes")
-            pcm_audio = convert_audio_if_needed(audio_bytes)
-            logger.info(f"转换后音频大小: {len(pcm_audio)} bytes")
+            # 检测音频格式
+            audio_format = "unknown"
+            if audio_bytes[:4] == b'RIFF':
+                audio_format = "WAV"
+            elif audio_bytes[:4] == b'\x1a\x45\xdf\xa3':
+                audio_format = "WebM"
+            elif audio_bytes[:3] == b'ID3' or audio_bytes[:2] == b'\xff\xfb':
+                audio_format = "MP3"
 
-            # 3. ASR转录（持久化保存音频到 OSS）
+            logger.info(f"音频大小: {len(audio_bytes)} bytes, 格式: {audio_format}")
+
+            # 2. ASR转录（paraformer-v2 原生支持 WebM，无需转换）
             logger.info("开始ASR转录（持久化模式）...")
             context_text = build_context_text(
                 resume_text=resume_text,
@@ -175,7 +180,7 @@ class InterviewerSubAgent:
             )
 
             asr_result, oss_info = await asr_service.transcribe_audio_bytes(
-                audio_data=pcm_audio,
+                audio_data=audio_bytes,  # 直接传原始 WebM 数据
                 context_text=context_text,
                 language="zh",
                 persist_audio=True  # 持久化保存音频

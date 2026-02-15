@@ -718,7 +718,7 @@ def _classify_request(user_input: str) -> str:
 ## 8. 技术实现细节
 
 ### 8.1 音频处理
-- 格式转换：使用 ffmpeg
+- 音频格式：WebM（paraformer-v2 原生支持）
 - OSS 上传：阿里云对象存储
 - 签名 URL：1小时有效期
 

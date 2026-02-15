@@ -139,8 +139,7 @@ class AgentState(TypedDict):
 │    ↓                                                             │
 │    Interviewer._process_audio():                                │
 │      ├─ Base64 解码                                              │
-│      ├─ ffmpeg 转换 (WebM → WAV)                                │
-│      ├─ OSS 上传 → 生成签名 URL                                 │
+│      ├─ OSS 上传 (WebM 格式) → 生成签名 URL                     │
 │      ├─ Transcription.async_call(file_urls=[signed_url])        │
 │      ├─ Transcription.wait() → 获取 transcription_url           │
 │      ├─ 下载并解析转录结果 JSON                                  │
@@ -178,9 +177,7 @@ WebSocket 传输
     ↓
 后端解码 (bytes)
     ↓
-ffmpeg 转换 (WebM → WAV)
-    ↓
-OSS 上传 → 签名 URL (有效期 1 小时)
+OSS 上传 (WebM 格式) → 签名 URL (有效期 1 小时)
     ↓
 Transcription.async_call(file_urls=[signed_url])
     ↓
