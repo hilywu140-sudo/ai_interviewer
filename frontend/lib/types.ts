@@ -97,10 +97,11 @@ export interface SessionCreate {
 
 export interface PracticeFeedback {
   analysis: string
-  strengths: string
-  improvements: string
-  encouragement: string
-  raw_content: string  // 原始 XML 内容
+  overall_score?: number  // 总分（可选）
+  strengths: string | string[]  // 优点（字符串或数组）
+  improvements: string | string[]  // 改进建议（字符串或数组）
+  encouragement?: string  // 鼓励语（可选）
+  raw_content?: string  // 原始 XML 内容（可选）
 }
 
 // ============ 逐字稿时间戳相关 ============

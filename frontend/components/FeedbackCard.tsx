@@ -14,6 +14,10 @@ interface FeedbackCardProps {
 export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCardProps) {
   const { analysis, overall_score, strengths, improvements } = feedback
 
+  // 将字符串或数组统一转换为数组
+  const strengthsList = Array.isArray(strengths) ? strengths : (strengths ? [strengths] : [])
+  const improvementsList = Array.isArray(improvements) ? improvements : (improvements ? [improvements] : [])
+
   return (
     <div className="bg-cream-50 border border-cream-300 rounded-card shadow-card overflow-hidden">
       {/* 头部 - 总分 */}
@@ -60,7 +64,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
         )}
 
         {/* 优点 */}
-        {strengths.length > 0 && (
+        {strengthsList.length > 0 && (
           <div>
             <h4 className="font-medium text-sm text-sage-300 mb-2 flex items-center gap-2">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -69,7 +73,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
               优点
             </h4>
             <ul className="space-y-1.5">
-              {strengths.map((item, index) => (
+              {strengthsList.map((item, index) => (
                 <li key={index} className="text-sm text-ink-100 flex items-start gap-2 font-light">
                   <span className="text-sage-300 mt-1">•</span>
                   {item}
@@ -80,7 +84,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
         )}
 
         {/* 改进建议 */}
-        {improvements.length > 0 && (
+        {improvementsList.length > 0 && (
           <div>
             <h4 className="font-medium text-sm text-warm-300 mb-2 flex items-center gap-2">
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -89,7 +93,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
               改进建议
             </h4>
             <ul className="space-y-1.5">
-              {improvements.map((item, index) => (
+              {improvementsList.map((item, index) => (
                 <li key={index} className="text-sm text-ink-100 flex items-start gap-2 font-light">
                   <span className="text-warm-300 mt-1">•</span>
                   {item}
