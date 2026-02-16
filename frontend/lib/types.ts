@@ -175,6 +175,9 @@ export type ServerMessageType =
   | 'recording_start'      // 开始录音指令
   | 'transcription'        // 转录结果
   | 'feedback'             // STAR分析结果
+  | 'feedback_stream_start'  // 流式反馈开始
+  | 'feedback_chunk'         // 流式反馈内容块
+  | 'feedback_stream_end'    // 流式反馈结束
   | 'generation_cancelled' // 生成被取消
   | 'error'                // 错误
 
