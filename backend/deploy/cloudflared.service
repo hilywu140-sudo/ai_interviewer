@@ -1,0 +1,20 @@
+[Unit]
+Description=Cloudflare Tunnel for AI Interview Coach
+After=network.target ai-interviewer.service
+Wants=ai-interviewer.service
+
+[Service]
+Type=simple
+User=ai_interviewer
+Group=ai_interviewer
+ExecStart=/usr/local/bin/cloudflared tunnel --url http://127.0.0.1:8001
+Restart=always
+RestartSec=10
+
+# 日志
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=cloudflared
+
+[Install]
+WantedBy=multi-user.target

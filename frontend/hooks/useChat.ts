@@ -265,7 +265,9 @@ export function useChat(sessionId: string): UseChatReturn {
       return
     }
 
-    const wsUrl = `ws://localhost:8001/ws/chat/${sessionId}?token=${encodeURIComponent(token)}`
+    // 使用环境变量配置 WebSocket URL
+    const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8001'
+    const wsUrl = `${wsBaseUrl}/ws/chat/${sessionId}?token=${encodeURIComponent(token)}`
     const ws = new WebSocket(wsUrl)
 
     ws.onopen = () => {

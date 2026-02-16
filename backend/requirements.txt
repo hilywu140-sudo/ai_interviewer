@@ -35,3 +35,7 @@ python-jose[cryptography]==3.3.0
 # Aliyun SMS
 alibabacloud_dysmsapi20170525==3.0.0
 alibabacloud_tea_openapi==0.3.11
+
+# Aliyun Services
+dashscope>=1.14.0
+oss2>=2.18.0
