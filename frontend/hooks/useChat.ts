@@ -25,6 +25,8 @@ interface UseChatReturn {
     isSubmitted: boolean  // 是否已提交等待分析
     isStreaming: boolean  // 是否正在流式输出
     streamingContent: string  // 流式输出内容
+    isFeedbackStreaming: boolean  // 是否正在流式反馈
+    feedbackStreamingContent: string  // 流式反馈内容
     projectId: string | null  // 项目ID
     pendingQuery: string  // 待处理的用户输入（用于取消后恢复）
     messageContext: MessageContext | null  // 消息上下文（用于逐字稿修改）
