@@ -6,7 +6,7 @@
 set -e  # 遇到错误立即退出
 
 # 配置
-PROJECT_DIR="/opt/AI_Interviewer"
+PROJECT_DIR="/opt/ai_interviewer"
 SERVICE_NAME="ai-interviewer.service"
 BRANCH="main"
 
