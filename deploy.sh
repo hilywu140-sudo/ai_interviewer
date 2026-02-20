@@ -31,10 +31,12 @@ git fetch origin $BRANCH
 git reset --hard origin/$BRANCH
 echo "代码更新完成"
 
-# 安装依赖
+# 安装依赖（使用虚拟环境）
 echo -e "\n${YELLOW}[3/5] 检查并安装依赖...${NC}"
 cd backend
+source venv/bin/activate
 pip install -r requirements.txt --quiet
+deactivate
 echo "依赖安装完成"
 
 # 重启服务
