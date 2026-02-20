@@ -69,7 +69,7 @@ export default function EditProjectPage() {
 
   if (loadingProject) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-cream-100">
+      <div className="min-h-screen flex items-center justify-center bg-cream-50">
         <div className="flex items-center gap-3 text-ink-50">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-warm-300"></div>
           <span className="text-sm font-light">加载中...</span>
@@ -79,7 +79,7 @@ export default function EditProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-100">
+    <div className="min-h-screen bg-cream-50">
       <div className="max-w-xl mx-auto px-6 py-12">
         {/* 头部 */}
         <motion.div
@@ -97,7 +97,7 @@ export default function EditProjectPage() {
             </svg>
           </button>
           <div>
-            <h1 className="font-serif text-xl text-ink-300 tracking-tight">编辑项目</h1>
+            <h1 className="text-xl text-ink-300 tracking-tight font-semibold">编辑项目</h1>
             <p className="text-sm text-ink-50 font-light mt-0.5">
               修改项目信息
             </p>
@@ -113,7 +113,7 @@ export default function EditProjectPage() {
         >
           {/* 项目名称 */}
           <div>
-            <label className="block font-serif text-sm text-ink-200 tracking-wide mb-3">
+            <label className="block text-sm text-ink-200 tracking-wide mb-3 font-medium">
               项目名称 <span className="text-rose-300">*</span>
             </label>
             <input
@@ -130,7 +130,7 @@ export default function EditProjectPage() {
 
           {/* 职位描述 */}
           <div>
-            <label className="block font-serif text-sm text-ink-200 tracking-wide mb-3">
+            <label className="block text-sm text-ink-200 tracking-wide mb-3 font-medium">
               职位描述 (JD) <span className="text-rose-300">*</span>
             </label>
             <textarea

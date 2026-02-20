@@ -15,7 +15,7 @@ from schemas.auth import (
     UserInfo,
     MeResponse
 )
-from services.sms_service import sms_service
+from services.email_service import email_service
 from services.auth_service import auth_service
 from dependencies.auth import get_current_user
 
@@ -38,17 +38,17 @@ async def send_verification_code(
     db: Session = Depends(get_db)
 ):
     """
-    发送短信验证码
+    发送邮件验证码
 
     - 60秒内不能重复发送
     - 每个IP每小时最多10次
-    - 每个手机号每天最多10次
+    - 每个邮箱每天最多50次
     """
     ip_address = get_client_ip(request)
 
-    success, message = sms_service.send_verification_code(
+    success, message = email_service.send_verification_code(
         db=db,
-        phone=body.phone,
+        email=body.email,
         ip_address=ip_address,
         purpose="login"
     )
@@ -73,9 +73,9 @@ async def login(
     - 返回 JWT Token
     """
     # 验证验证码
-    valid, error_msg = sms_service.verify_code(
+    valid, error_msg = email_service.verify_code(
         db=db,
-        phone=body.phone,
+        email=body.email,
         code=body.code,
         purpose="login"
     )
@@ -87,7 +87,7 @@ async def login(
         )
 
     # 获取或创建用户
-    user, is_new = auth_service.get_or_create_user(db, body.phone)
+    user, is_new = auth_service.get_or_create_user(db, body.email)
 
     # 生成 Token
     token = auth_service.create_access_token(user)
@@ -100,7 +100,7 @@ async def login(
         expires_in=7 * 24 * 3600,  # 7天
         user=UserInfo(
             id=user.id,
-            phone=user.phone,
+            email=user.email,
             nickname=user.nickname,
             avatar_url=user.avatar_url,
             is_verified=user.is_verified,
@@ -120,7 +120,7 @@ async def get_current_user_info(
     """
     return MeResponse(
         id=current_user.id,
-        phone=current_user.phone,
+        email=current_user.email,
         nickname=current_user.nickname,
         avatar_url=current_user.avatar_url,
         is_active=current_user.is_active,

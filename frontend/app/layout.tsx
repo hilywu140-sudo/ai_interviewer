@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import { Noto_Serif_SC, Noto_Sans_SC, Playfair_Display } from 'next/font/google'
 import './globals.css'
-import { AuthProvider } from '@/lib/auth-context'
-import { AuthGuard } from '@/components/AuthGuard'
+import { ClerkProvider } from '@clerk/nextjs'
+import { zhCN } from '@clerk/localizations'
+import { ClientProviders } from '@/components/ClientProviders'
 
 const notoSerif = Noto_Serif_SC({
   subsets: ['latin'],
@@ -36,14 +37,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="zh-CN">
-      <body className={`${notoSerif.variable} ${notoSans.variable} ${playfair.variable} font-sans bg-cream-100 text-ink-300 antialiased`}>
-        <AuthProvider>
-          <AuthGuard>
+    <ClerkProvider localization={zhCN}>
+      <html lang="zh-CN">
+        <body className={`${notoSerif.variable} ${notoSans.variable} ${playfair.variable} font-sans bg-cream-50 text-ink-300 antialiased`}>
+          <ClientProviders>
             {children}
-          </AuthGuard>
-        </AuthProvider>
-      </body>
-    </html>
+          </ClientProviders>
+        </body>
+      </html>
+    </ClerkProvider>
   )
 }

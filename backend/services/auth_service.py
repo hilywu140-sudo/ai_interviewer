@@ -31,7 +31,7 @@ class AuthService:
 
         payload = {
             "sub": str(user.id),
-            "phone": user.phone,
+            "email": user.email,
             "iat": now,
             "exp": expire
         }
@@ -53,7 +53,7 @@ class AuthService:
 
             token_data = TokenPayload(
                 sub=payload["sub"],
-                phone=payload["phone"],
+                email=payload["email"],
                 exp=datetime.fromtimestamp(payload["exp"], tz=timezone.utc),
                 iat=datetime.fromtimestamp(payload["iat"], tz=timezone.utc)
             )
@@ -66,14 +66,14 @@ class AuthService:
     def get_or_create_user(
         self,
         db: Session,
-        phone: str
+        email: str
     ) -> Tuple[User, bool]:
         """
         获取或创建用户
 
         返回: (用户, 是否新创建)
         """
-        user = db.query(User).filter(User.phone == phone).first()
+        user = db.query(User).filter(User.email == email).first()
 
         if user:
             # 更新登录信息
@@ -86,7 +86,7 @@ class AuthService:
 
         # 创建新用户
         user = User(
-            phone=phone,
+            email=email,
             is_verified=True,
             last_login_at=datetime.now(timezone.utc),
             login_count=1
@@ -100,9 +100,9 @@ class AuthService:
         """根据 ID 获取用户"""
         return db.query(User).filter(User.id == user_id).first()
 
-    def get_user_by_phone(self, db: Session, phone: str) -> Optional[User]:
-        """根据手机号获取用户"""
-        return db.query(User).filter(User.phone == phone).first()
+    def get_user_by_email(self, db: Session, email: str) -> Optional[User]:
+        """根据邮箱获取用户"""
+        return db.query(User).filter(User.email == email).first()
 
 
 # 全局实例

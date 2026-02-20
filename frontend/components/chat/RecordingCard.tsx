@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { RecordingState } from '@/lib/types'
+import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
 interface RecordingCardProps {
   question: string
@@ -61,9 +62,20 @@ export function RecordingCard({
       }
 
       mediaRecorder.start()
+
+      // 埋点：开始录音
+      analytics.track(AnalyticsEvents.RECORDING_START, { question })
+
       onStartRecording()
     } catch (error) {
       console.error('Failed to start recording:', error)
+
+      // 埋点：录音错误
+      analytics.track(AnalyticsEvents.RECORDING_ERROR, {
+        error_type: 'permission_denied',
+        error_message: String(error),
+      })
+
       alert('无法访问麦克风，请检查权限设置')
     }
   }
@@ -72,6 +84,11 @@ export function RecordingCard({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
       mediaRecorderRef.current.pause()
       setIsPaused(true)
+
+      // 埋点：暂停录音
+      analytics.track(AnalyticsEvents.RECORDING_PAUSE, {
+        duration_so_far: recordingState.duration,
+      })
     }
   }
 
@@ -79,12 +96,21 @@ export function RecordingCard({
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'paused') {
       mediaRecorderRef.current.resume()
       setIsPaused(false)
+
+      // 埋点：继续录音
+      analytics.track(AnalyticsEvents.RECORDING_RESUME)
     }
   }
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && (mediaRecorderRef.current.state === 'recording' || mediaRecorderRef.current.state === 'paused')) {
       mediaRecorderRef.current.stop()
+
+      // 埋点：完成录音
+      analytics.track(AnalyticsEvents.RECORDING_COMPLETE, {
+        total_duration: recordingState.duration,
+      })
+
       onStopRecording()
     }
   }
@@ -95,6 +121,12 @@ export function RecordingCard({
     reader.onloadend = () => {
       const base64 = reader.result as string
       const base64Data = base64.split(',')[1]
+
+      // 埋点：提交录音
+      analytics.track(AnalyticsEvents.RECORDING_SUBMIT, {
+        audio_duration: recordingState.duration,
+      })
+
       onSubmitAudio(base64Data, previewUrl || undefined)
       // 不清除 audioBlob/previewUrl，让 isSubmitted 控制 UI 显示"等待分析"
     }
@@ -102,6 +134,9 @@ export function RecordingCard({
   }
 
   const handleReRecord = () => {
+    // 埋点：重新录音
+    analytics.track(AnalyticsEvents.RECORDING_RERECORD)
+
     setAudioBlob(null)
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
@@ -116,6 +151,12 @@ export function RecordingCard({
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop())
     }
+
+    // 埋点：取消录音
+    analytics.track(AnalyticsEvents.RECORDING_CANCEL, {
+      duration_so_far: recordingState.duration,
+    })
+
     setAudioBlob(null)
     if (previewUrl) {
       URL.revokeObjectURL(previewUrl)
@@ -134,7 +175,7 @@ export function RecordingCard({
   }, [previewUrl])
 
   return (
-    <div className="bg-cream-50 border border-cream-300 rounded-card shadow-card overflow-hidden">
+    <div className="bg-white border border-cream-300 rounded-card shadow-card overflow-hidden">
       {/* 问题显示 */}
       <div className="bg-warm-50 px-5 py-4 border-b border-warm-100">
         <div className="flex items-center gap-2 text-warm-400 text-sm font-medium mb-1">

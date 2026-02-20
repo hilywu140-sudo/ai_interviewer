@@ -12,12 +12,12 @@ from uuid import UUID
 
 class SendCodeRequest(BaseModel):
     """发送验证码请求"""
-    phone: str = Field(..., min_length=11, max_length=11, pattern=r"^1[3-9]\d{9}$", description="手机号")
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="邮箱地址")
 
 
 class LoginRequest(BaseModel):
     """登录请求"""
-    phone: str = Field(..., min_length=11, max_length=11, pattern=r"^1[3-9]\d{9}$", description="手机号")
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", description="邮箱地址")
     code: str = Field(..., min_length=6, max_length=6, description="验证码")
 
 
@@ -33,7 +33,7 @@ class SendCodeResponse(BaseModel):
 class UserInfo(BaseModel):
     """用户信息"""
     id: UUID
-    phone: str
+    email: str
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
     is_verified: bool
@@ -56,7 +56,7 @@ class LoginResponse(BaseModel):
 class TokenPayload(BaseModel):
     """JWT Token Payload"""
     sub: str  # user_id
-    phone: str
+    email: str
     exp: datetime
     iat: datetime
 
@@ -64,7 +64,7 @@ class TokenPayload(BaseModel):
 class MeResponse(BaseModel):
     """获取当前用户响应"""
     id: UUID
-    phone: str
+    email: str
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool

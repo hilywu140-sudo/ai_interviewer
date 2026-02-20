@@ -2,6 +2,7 @@ from typing import List, Dict, Optional, AsyncGenerator
 from openai import AsyncOpenAI
 import tiktoken
 from config import settings
+from langsmith.wrappers import wrap_openai
 
 
 class LLMService:
@@ -11,21 +12,21 @@ class LLMService:
         self.provider = provider or settings.default_llm_provider
 
         if self.provider == "deepseek":
-            self.client = AsyncOpenAI(
+            self.client = wrap_openai(AsyncOpenAI(
                 api_key=settings.deepseek_api_key,
                 base_url=settings.deepseek_base_url
-            )
+            ))
             self.default_model = "deepseek-chat"
         elif self.provider == "openai":
-            self.client = AsyncOpenAI(api_key=settings.openai_api_key)
+            self.client = wrap_openai(AsyncOpenAI(api_key=settings.openai_api_key))
             self.default_model = "gpt-4"
         elif self.provider == "qwen":
             # 千问使用 DashScope API Key
             api_key = settings.qwen_api_key or settings.dashscope_api_key
-            self.client = AsyncOpenAI(
+            self.client = wrap_openai(AsyncOpenAI(
                 api_key=api_key,
                 base_url=settings.qwen_base_url
-            )
+            ))
             self.default_model = settings.qwen_supervisor_model
         elif self.provider == "anthropic":
             # Anthropic 使用不同的客户端，暂时不实现

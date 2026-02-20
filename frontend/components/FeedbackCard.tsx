@@ -57,7 +57,7 @@ export default function FeedbackCard({ feedback, assetId, onClose }: FeedbackCar
               </svg>
               详细分析
             </h4>
-            <div className="bg-cream-100 rounded-card p-5 text-sm text-ink-100 whitespace-pre-wrap leading-relaxed">
+            <div className="bg-cream-50 rounded-card p-5 text-sm text-ink-100 whitespace-pre-wrap leading-relaxed">
               {analysis}
             </div>
           </div>

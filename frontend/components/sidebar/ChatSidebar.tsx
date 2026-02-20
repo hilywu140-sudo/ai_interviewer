@@ -4,8 +4,9 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Asset, Session, Project, MessageContext } from '@/lib/types'
 import { assetsApi, sessionsApi, projectsApi } from '@/lib/api-client'
-import { useAuth } from '@/lib/auth-context'
+import { useUser, useClerk } from '@clerk/nextjs'
 import { Avatar } from '@/components/ui/Avatar'
+import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
 interface FillInputData {
   content: string
@@ -40,7 +41,8 @@ export function ChatSidebar({
   refreshKey
 }: ChatSidebarProps) {
   const router = useRouter()
-  const { user, logout } = useAuth()
+  const { user } = useUser()
+  const { signOut } = useClerk()
   const [project, setProject] = useState<Project | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
@@ -49,15 +51,20 @@ export function ChatSidebar({
   const [deletingQuestion, setDeletingQuestion] = useState<string | null>(null)
   const [highlightedQuestion, setHighlightedQuestion] = useState<string | null>(null)
 
-  // 手机号脱敏: 138****1234
-  const maskPhone = (phone?: string) => {
-    if (!phone) return ''
-    return phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2')
+  // 邮箱脱敏: u***@example.com
+  const maskEmail = (email?: string) => {
+    if (!email) return ''
+    const [local, domain] = email.split('@')
+    if (!domain) return email
+    const maskedLocal = local.length > 2
+      ? local[0] + '***' + local[local.length - 1]
+      : local[0] + '***'
+    return `${maskedLocal}@${domain}`
   }
 
   // 退出登录
   const handleLogout = async () => {
-    await logout()
+    await signOut()
     router.push('/login')
   }
 
@@ -148,7 +155,11 @@ export function ChatSidebar({
         title: `练习室 ${newNumber}`
       })
       setSessions(prev => [session, ...prev])
-      router.push(`/chat/${session.id}`)
+
+      // 埋点：新建会话
+      analytics.track(AnalyticsEvents.SESSION_CREATE)
+
+      onSessionChange?.(session.id)
     } catch (error) {
       console.error('Failed to create session:', error)
       alert('创建会话失败')
@@ -160,7 +171,11 @@ export function ChatSidebar({
   // 切换会话
   const handleSwitchSession = (sessionId: string) => {
     if (sessionId !== currentSessionId) {
-      router.push(`/chat/${sessionId}`)
+      // 埋点：切换会话
+      analytics.track(AnalyticsEvents.SESSION_SWITCH, {
+        target_session_id: sessionId,
+      })
+
       onSessionChange?.(sessionId)
     }
   }
@@ -199,6 +214,12 @@ export function ChatSidebar({
       return
     }
 
+    // 埋点：删除练习记录
+    analytics.track(AnalyticsEvents.ASSET_DELETE, {
+      question,
+      asset_count: questionAssets.length,
+    })
+
     setDeletingQuestion(question)
     try {
       for (const asset of questionAssets) {
@@ -217,7 +238,7 @@ export function ChatSidebar({
     <>
       {/* 侧边栏 */}
       <div
-        className={`h-full bg-white border-r border-cream-300 transition-all duration-300 flex flex-col ${
+        className={`h-full bg-cream-50 transition-all duration-300 flex flex-col ${
           isOpen ? 'w-80' : 'w-0'
         } overflow-hidden flex-shrink-0`}
       >
@@ -252,7 +273,7 @@ export function ChatSidebar({
                   <button
                     onClick={handleCreateSession}
                     disabled={creatingSession}
-                    className="flex items-center gap-1 text-xs text-warm-300 hover:text-warm-400 bg-white hover:bg-warm-50 px-2.5 py-1 rounded-button disabled:opacity-50 transition-all"
+                    className="flex items-center gap-1 text-xs text-warm-300 hover:text-warm-400 bg-cream-50 hover:bg-cream-100 px-2.5 py-1 rounded-button disabled:opacity-50 transition-all"
                   >
                     {creatingSession ? (
                       <div className="w-3 h-3 animate-spin rounded-full border border-warm-300 border-t-transparent"></div>
@@ -280,7 +301,7 @@ export function ChatSidebar({
                         onClick={() => handleSwitchSession(session.id)}
                         className={`w-full text-left px-3 py-2 rounded-button text-sm transition-all ${
                           session.id === currentSessionId
-                            ? 'bg-cream-100 text-ink-200 font-medium border-l-2 border-l-warm-300'
+                            ? 'bg-white text-ink-200 font-medium border-l-2 border-l-warm-300'
                             : 'text-ink-100 hover:bg-cream-200'
                         }`}
                       >
@@ -292,8 +313,10 @@ export function ChatSidebar({
                             <span className="ml-2 w-1.5 h-1.5 bg-warm-300 rounded-full flex-shrink-0"></span>
                           )}
                         </div>
-                        <div className="text-xs text-cream-400 mt-0.5 font-light">
-                          {formatTime(session.started_at)}
+                        <div className="flex items-center mt-1">
+                          <span className="text-xs text-cream-400 font-light ml-auto">
+                            {formatTime(session.started_at)}
+                          </span>
                         </div>
                       </button>
                     ))
@@ -328,6 +351,11 @@ export function ChatSidebar({
                         <div key={question} className="group">
                           <div
                             onClick={() => {
+                              // 埋点：查看详情
+                              analytics.track(AnalyticsEvents.ASSET_VIEW_DETAIL, {
+                                asset_id: latestAsset.id,
+                                question,
+                              })
                               // 点击问题时，打开详情面板
                               onSelectAsset(latestAsset)
                             }}
@@ -345,6 +373,11 @@ export function ChatSidebar({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  // 埋点：载入到输入框
+                                  analytics.track(AnalyticsEvents.ASSET_LOAD_TO_INPUT, {
+                                    asset_id: latestAsset.id,
+                                    question,
+                                  })
                                   onFillInput({
                                     content: latestAsset.transcript || '',
                                     context: {
@@ -357,7 +390,7 @@ export function ChatSidebar({
                                 title="载入到输入框优化"
                                 className="p-1 hover:bg-warm-50 rounded transition-all text-cream-400 hover:text-warm-300 flex-shrink-0"
                               >
-                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-3.5 h-3.5 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
                                 </svg>
                               </button>
@@ -414,12 +447,12 @@ export function ChatSidebar({
         </div>
 
         {/* 底部用户信息 */}
-        <div className="flex-shrink-0 border-t border-cream-300 p-4">
+        <div className="flex-shrink-0 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Avatar type="user" size="sm" />
               <span className="text-sm text-ink-200">
-                {user?.nickname || maskPhone(user?.phone)}
+                {user?.firstName || maskEmail(user?.primaryEmailAddress?.emailAddress)}
               </span>
             </div>
             <button

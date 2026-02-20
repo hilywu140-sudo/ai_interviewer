@@ -16,6 +16,7 @@ logging.getLogger("agents").setLevel(logging.DEBUG)
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from config import settings
 from database import engine, Base
 from api import projects, sessions, messages, websocket, audio, assets, auth
@@ -23,11 +24,29 @@ from api import projects, sessions, messages, websocket, audio, assets, auth
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """应用生命周期管理"""
+    # 启动时预加载 Clerk JWKS
+    try:
+        from dependencies.auth import get_clerk_jwks_sync
+        get_clerk_jwks_sync()
+        print("[STARTUP] Clerk JWKS 预加载完成")
+    except Exception as e:
+        print(f"[STARTUP] Clerk JWKS 预加载失败: {e}")
+
+    yield  # 应用运行中
+
+    # 关闭时清理（如果需要）
+
+
 app = FastAPI(
     title="AI Interview Coach API",
     description="Backend API for AI Interview Coach MVP",
     version="0.1.0",
     redirect_slashes=False,  # 禁用自动重定向，避免 Authorization header 丢失
+    lifespan=lifespan,
 )
 
 # CORS middleware

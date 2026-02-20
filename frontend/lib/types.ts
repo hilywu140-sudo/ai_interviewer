@@ -2,7 +2,7 @@
 
 export interface User {
   id: string
-  phone: string
+  email: string
   nickname?: string
   avatar_url?: string
   is_active: boolean
@@ -13,7 +13,7 @@ export interface User {
 }
 
 export interface SendCodeRequest {
-  phone: string
+  email: string
 }
 
 export interface SendCodeResponse {
@@ -23,7 +23,7 @@ export interface SendCodeResponse {
 }
 
 export interface LoginRequest {
-  phone: string
+  email: string
   code: string
 }
 
@@ -273,6 +273,8 @@ export interface ChatMessage {
   // 录音提交状态
   isRecordingSubmitted?: boolean     // 录音是否已提交
   isRecordingCancelled?: boolean     // 录音是否已取消
+  // 点赞相关
+  liked?: boolean                    // 是否已点赞
 }
 
 // 录音状态

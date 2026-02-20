@@ -47,9 +47,12 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_days: int = 7
 
-    # 阿里云短信
-    aliyun_sms_sign_name: Optional[str] = None  # 短信签名
-    aliyun_sms_template_code: Optional[str] = None  # 短信模板代码
+    # 阿里云邮件推送
+    aliyun_dm_account_name: Optional[str] = None  # 发信地址
+    aliyun_dm_from_alias: Optional[str] = None  # 发信人昵称
+
+    # Clerk 认证
+    clerk_secret_key: Optional[str] = None  # Clerk Secret Key (sk_test_xxx)
 
     @property
     def cors_origins_list(self) -> List[str]:

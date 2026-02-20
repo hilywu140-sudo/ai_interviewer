@@ -20,7 +20,7 @@ export function ChatHeader({
   isSidebarOpen
 }: ChatHeaderProps) {
   return (
-    <header className="bg-white border-b border-cream-200 px-4 py-3 flex items-center justify-between">
+    <header className="bg-white px-4 py-3 flex items-center justify-between">
       <div className="flex items-center gap-3">
         {/* 侧边栏切换按钮 */}
         {onToggleSidebar && (

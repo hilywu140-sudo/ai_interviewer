@@ -67,3 +67,28 @@ def get_message(message_id: UUID, db: Session = Depends(get_db)):
     if not message:
         raise HTTPException(status_code=404, detail="Message not found")
     return message
+
+
+@router.patch("/{message_id}/like")
+def toggle_like(message_id: UUID, db: Session = Depends(get_db)):
+    """切换消息点赞状态"""
+    message = db.query(Message).filter(Message.id == message_id).first()
+    if not message:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    # 从 meta 中获取当前点赞状态
+    meta = message.meta or {}
+    current_liked = meta.get('liked', False)
+
+    # 切换状态
+    meta['liked'] = not current_liked
+    message.meta = meta
+
+    # 标记字段已修改（SQLAlchemy JSON 字段需要）
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(message, 'meta')
+
+    db.commit()
+    db.refresh(message)
+
+    return {"message_id": str(message_id), "liked": meta['liked']}

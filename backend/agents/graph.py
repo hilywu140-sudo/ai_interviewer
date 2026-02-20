@@ -15,6 +15,14 @@ from .supervisor import supervisor_node
 from .subagents.interviewer import interviewer_node
 from .subagents.chat import chat_node
 
+# LangSmith 追踪
+try:
+    from langsmith.run_helpers import get_current_run_tree
+    LANGSMITH_AVAILABLE = True
+except ImportError:
+    LANGSMITH_AVAILABLE = False
+    get_current_run_tree = None
+
 logger = logging.getLogger(__name__)
 
 # 全局图实例缓存
@@ -246,8 +254,22 @@ async def process_message(
 
     # 执行图
     result = None
+    langsmith_trace_id = None
+    langsmith_parent_run_id = None
+
     try:
         async for event in graph.astream(input_state, config):
+            # 尝试获取当前的 LangSmith run tree
+            if LANGSMITH_AVAILABLE and langsmith_trace_id is None:
+                try:
+                    current_run = get_current_run_tree()
+                    if current_run:
+                        langsmith_trace_id = str(current_run.trace_id) if current_run.trace_id else None
+                        langsmith_parent_run_id = str(current_run.id) if current_run.id else None
+                        logger.debug(f"获取到 LangSmith trace_id: {langsmith_trace_id}, parent_run_id: {langsmith_parent_run_id}")
+                except Exception as e:
+                    logger.debug(f"获取 LangSmith run tree 失败: {e}")
+
             # 获取最后一个事件的状态
             for node_name, node_state in event.items():
                 result = node_state
@@ -307,5 +329,8 @@ async def process_message(
         # 消息上下文相关字段（用于逐字稿修改）
         "original_transcript": result.get("original_transcript"),
         "context_question": result.get("context_question"),
-        "context_asset_id": result.get("context_asset_id")
+        "context_asset_id": result.get("context_asset_id"),
+        # LangSmith trace context（用于流式输出时关联到同一个 trace）
+        "langsmith_trace_id": langsmith_trace_id,
+        "langsmith_parent_run_id": langsmith_parent_run_id
     }

@@ -9,10 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@clerk/localizations": "^3.35.5",
+    "@clerk/nextjs": "^6.37.5",
     "@tailwindcss/typography": "^0.5.19",
     "axios": "^1.6.5",
     "framer-motion": "^12.34.0",
-    "next": "14.1.0",
+    "next": "^14.2.25",
+    "posthog-js": "^1.351.4",
     "react": "^18",
     "react-dom": "^18",
     "react-markdown": "^10.1.0",

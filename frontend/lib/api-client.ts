@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { Project, ProjectCreate, Session, SessionCreate, Message, MessageListResponse, Asset, AssetCreate, AssetUpdate } from './types'
-import { getToken, clearToken } from './auth-api'
+import { getClerkToken } from './clerk-token'
 
 // 使用空字符串作为 baseURL，让请求使用相对路径
 // Next.js 的 rewrites 会将 /api/* 重定向到 http://localhost:8001/api/*
@@ -14,10 +14,10 @@ const apiClient = axios.create({
   maxRedirects: 5, // 允许重定向
 })
 
-// 请求拦截器 - 添加 Token
+// 请求拦截器 - 添加 Clerk Token
 apiClient.interceptors.request.use(
-  (config) => {
-    const token = getToken()
+  async (config) => {
+    const token = await getClerkToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -28,19 +28,27 @@ apiClient.interceptors.request.use(
   }
 )
 
-// 响应拦截器 - 处理 401 错误
+// 响应拦截器 - 处理 401 错误（token 未就绪时自动重试）
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    // 不在这里自动跳转，让 AuthGuard 处理
-    // 只有明确的 401 且不是 /auth/me 请求时才清除 token
-    if (error.response?.status === 401) {
-      const requestUrl = error.config?.url || ''
-      // /auth/me 返回 401 是正常的（token 过期），不要强制跳转
-      if (!requestUrl.includes('/auth/me')) {
-        clearToken()
+  async (error) => {
+    const originalRequest = error.config
+
+    // 如果是 401 错误且还没有重试过
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+
+      // 等待一段时间让 Clerk 初始化完成
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // 重新获取 token
+      const token = await getClerkToken()
+      if (token) {
+        originalRequest.headers.Authorization = `Bearer ${token}`
+        return apiClient.request(originalRequest)
       }
     }
+
     return Promise.reject(error)
   }
 )
@@ -123,6 +131,11 @@ export const messagesApi = {
       order: options?.order || 'desc'
     }
     const response = await apiClient.get('/api/messages', { params })
+    return response.data
+  },
+
+  toggleLike: async (messageId: string): Promise<{ message_id: string; liked: boolean }> => {
+    const response = await apiClient.patch(`/api/messages/${messageId}/like`)
     return response.data
   },
 }

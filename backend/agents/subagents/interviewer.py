@@ -216,7 +216,7 @@ class InterviewerSubAgent:
                             file_path=oss_url,  # 使用 OSS URL 作为 file_path
                             oss_key=oss_key,
                             oss_url=oss_url,
-                            file_size=len(pcm_audio),
+                            file_size=len(audio_bytes),
                             format="wav",
                             asr_status="completed",
                             asr_result={"transcript": transcript, "sentences": transcript_sentences},

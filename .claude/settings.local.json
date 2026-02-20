@@ -33,7 +33,9 @@
       "WebFetch(domain:www.alibabacloud.com)",
       "WebFetch(domain:deepwiki.com)",
       "WebFetch(domain:pypi.org)",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(timeout 5 python:*)",
+      "WebFetch(domain:docs.langchain.com)"
     ],
     "deny": [],
     "ask": []

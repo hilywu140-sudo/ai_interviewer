@@ -5,22 +5,25 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { projectsApi, sessionsApi } from '@/lib/api-client'
 import { Project } from '@/lib/types'
-import { useAuth } from '@/lib/auth-context'
+import { useAuth } from '@clerk/nextjs'
 import { motion } from 'framer-motion'
 
 export default function ProjectsPage() {
   const router = useRouter()
-  const { isAuthenticated, isLoading: authLoading } = useAuth()
+  const { isSignedIn, isLoaded } = useAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [navigatingProjectId, setNavigatingProjectId] = useState<string | null>(null)
 
   useEffect(() => {
-    // 等待认证完成再加载项目
-    if (!authLoading && isAuthenticated) {
-      loadProjects()
+    // 等待认证完成再加载项目，添加小延迟确保 token getter 已初始化
+    if (isLoaded && isSignedIn) {
+      const timer = setTimeout(() => {
+        loadProjects()
+      }, 100)
+      return () => clearTimeout(timer)
     }
-  }, [authLoading, isAuthenticated])
+  }, [isLoaded, isSignedIn])
 
   const loadProjects = async () => {
     try {
@@ -72,7 +75,7 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-cream-100">
+      <div className="min-h-screen flex items-center justify-center bg-cream-50">
         <div className="flex items-center gap-3 text-ink-50">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-warm-300"></div>
           <span className="text-sm font-light">加载中...</span>
@@ -82,7 +85,7 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-100">
+    <div className="min-h-screen bg-cream-50">
       <div className="max-w-5xl mx-auto px-6 py-12">
         {/* 头部 */}
         <motion.div
@@ -91,7 +94,7 @@ export default function ProjectsPage() {
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="flex justify-between items-center mb-12"
         >
-          <h1 className="font-serif text-2xl text-ink-300 tracking-tight">我的项目</h1>
+          <h1 className="text-2xl text-ink-300 tracking-tight font-semibold">我的项目</h1>
           <Link
             href="/projects/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 border border-warm-300 text-warm-300 text-sm font-medium rounded-button hover:bg-warm-300 hover:text-white transition-all duration-300"
@@ -111,7 +114,7 @@ export default function ProjectsPage() {
             transition={{ delay: 0.2 }}
             className="text-center py-24"
           >
-            <p className="font-serif text-lg text-cream-400">尚无项目</p>
+            <p className="text-lg text-cream-400">尚无项目</p>
             <Link
               href="/projects/new"
               className="mt-3 inline-block text-sm text-warm-300 hover:text-warm-400 underline underline-offset-4 decoration-warm-200"
@@ -127,7 +130,7 @@ export default function ProjectsPage() {
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, ease: 'easeOut', delay: index * 0.06 }}
-                className={`p-6 bg-cream-200/50 border border-cream-300 rounded-card
+                className={`p-6 bg-white border border-cream-300 rounded-card
                   hover:-translate-y-0.5 hover:shadow-card transition-all duration-300
                   ${navigatingProjectId === project.id ? 'opacity-50' : ''}`}
               >
@@ -135,7 +138,7 @@ export default function ProjectsPage() {
                   onClick={() => handleProjectClick(project)}
                   className="cursor-pointer"
                 >
-                  <h2 className="font-serif text-lg text-ink-300 mb-2 truncate">
+                  <h2 className="text-lg text-ink-300 mb-2 truncate font-medium">
                     {project.title}
                   </h2>
                   <p className="text-sm text-ink-50 line-clamp-2 mb-4 font-light leading-relaxed">
@@ -143,7 +146,7 @@ export default function ProjectsPage() {
                   </p>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="font-display text-xs text-cream-400">
+                  <span className="text-xs text-cream-400">
                     {new Date(project.created_at).toLocaleDateString()}
                   </span>
                   <div className="flex items-center gap-2">

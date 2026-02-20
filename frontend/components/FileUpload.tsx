@@ -94,7 +94,7 @@ export default function FileUpload({
 
   return (
     <div className="w-full">
-      <label className="block font-serif text-sm text-ink-200 tracking-wide mb-3">
+      <label className="block text-sm text-ink-200 tracking-wide mb-3 font-medium">
         {label}
       </label>
 

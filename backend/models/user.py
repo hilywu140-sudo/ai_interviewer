@@ -1,5 +1,5 @@
 """
-用户模型和短信验证码模型
+用户模型和邮件验证码模型
 """
 
 from sqlalchemy import Column, String, DateTime, Boolean, Integer
@@ -16,11 +16,12 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    phone = Column(String(20), unique=True, nullable=False, index=True)
+    clerk_user_id = Column(String(255), unique=True, nullable=True, index=True)  # Clerk 用户 ID
+    email = Column(String(255), unique=True, nullable=False, index=True)
     nickname = Column(String(100), nullable=True)
     avatar_url = Column(String(500), nullable=True)
     is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)  # 手机号是否已验证
+    is_verified = Column(Boolean, default=False)  # 邮箱是否已验证
     last_login_at = Column(DateTime(timezone=True), nullable=True)
     login_count = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -30,12 +31,12 @@ class User(Base):
     projects = relationship("Project", back_populates="user")
 
 
-class SmsVerificationCode(Base):
-    """短信验证码记录表（用于防刷和验证）"""
-    __tablename__ = "sms_verification_codes"
+class EmailVerificationCode(Base):
+    """邮件验证码记录表（用于防刷和验证）"""
+    __tablename__ = "email_verification_codes"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    phone = Column(String(20), nullable=False, index=True)
+    email = Column(String(255), nullable=False, index=True)
     code = Column(String(6), nullable=False)
     purpose = Column(String(20), default="login")  # login, register, reset
     is_used = Column(Boolean, default=False)

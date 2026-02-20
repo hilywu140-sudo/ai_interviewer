@@ -14,13 +14,15 @@ import logging
 import re
 import asyncio
 
+from langsmith import traceable
+
 from database import get_db
 from models import Message, Session as SessionModel, Project, Asset, User
 from services.websocket_manager import manager
 from services.callback_registry import register_callback, unregister_callback
 from agents.graph import process_message
 from agents.subagents.chat import chat_subagent, extract_optimized_answer
-from services.auth_service import auth_service
+from dependencies.auth import verify_clerk_token, get_or_create_user_from_clerk
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,9 @@ async def handle_stream_response(
     session_id: str,
     project_id: str | None,
     result: dict,
-    save_asset: bool = False
+    save_asset: bool = False,
+    langsmith_trace_id: str | None = None,
+    langsmith_parent_run_id: str | None = None
 ):
     """
     处理流式响应
@@ -50,6 +54,8 @@ async def handle_stream_response(
         project_id: 项目 ID
         result: LangGraph 返回的结果
         save_asset: 是否保存到 Asset
+        langsmith_trace_id: LangSmith trace_id，用于关联 trace
+        langsmith_parent_run_id: LangSmith parent_run_id，用于关联 trace
 
     Returns:
         bool: True 表示正常完成，False 表示被取消
@@ -88,6 +94,23 @@ async def handle_stream_response(
     # 流式输出
     full_content = ""
     cancelled = False
+
+    # 如果有 langsmith_trace_id，创建子 trace
+    run_tree = None
+    if langsmith_trace_id and langsmith_parent_run_id:
+        try:
+            from langsmith.run_trees import RunTree
+            from uuid import UUID as PyUUID
+            run_tree = RunTree(
+                name="chat_stream_response",
+                run_type="chain",
+                inputs={"intent": stream_state.get("intent"), "user_input": stream_state.get("user_input", "")[:100]},
+                parent_run_id=PyUUID(langsmith_parent_run_id),
+                trace_id=PyUUID(langsmith_trace_id)
+            )
+        except Exception as e:
+            logger.warning(f"创建 LangSmith RunTree 失败: {e}")
+
     try:
         async for chunk in chat_subagent.get_stream_generator(stream_state):
             # 检查是否被取消
@@ -133,6 +156,13 @@ async def handle_stream_response(
             },
             "timestamp": datetime.now().isoformat()
         })
+        # 结束 run_tree（CancelledError 情况）
+        if run_tree:
+            try:
+                run_tree.end(outputs={"cancelled": True, "partial_content_length": len(full_content)})
+                run_tree.post()
+            except Exception:
+                pass
         return False  # 返回 False 表示被取消，不重新抛出异常
     except Exception as e:
         logger.error(f"流式输出错误: {e}")
@@ -142,6 +172,13 @@ async def handle_stream_response(
             "error": str(e),
             "timestamp": datetime.now().isoformat()
         })
+        # 结束 run_tree（错误情况）
+        if run_tree:
+            try:
+                run_tree.end(error=str(e))
+                run_tree.post()
+            except Exception:
+                pass
         return False
 
     # 如果被取消（通过 cancel_event），保存并发送取消确认消息
@@ -172,9 +209,24 @@ async def handle_stream_response(
             },
             "timestamp": datetime.now().isoformat()
         })
+        # 结束 run_tree（取消情况）
+        if run_tree:
+            try:
+                run_tree.end(outputs={"cancelled": True, "partial_content_length": len(full_content)})
+                run_tree.post()
+            except Exception:
+                pass
         return False
 
     # 流式结束后处理
+    # 结束 run_tree（正常完成）
+    if run_tree:
+        try:
+            run_tree.end(outputs={"full_content_length": len(full_content), "intent": stream_state.get("intent")})
+            run_tree.post()
+        except Exception as e:
+            logger.warning(f"结束 LangSmith RunTree 失败: {e}")
+
     asset_id = None
     extracted_question = result.get("extracted_question")
     pending_save = None
@@ -264,12 +316,14 @@ async def websocket_endpoint(
     # 获取数据库会话
     db = next(get_db())
 
-    # 验证 Token
+    # 验证 Token (使用 Clerk JWT)
     current_user = None
     if token:
-        valid, token_data, _ = auth_service.verify_token(token)
-        if valid:
-            current_user = auth_service.get_user_by_id(db, UUID(token_data.sub))
+        try:
+            payload = await verify_clerk_token(token)
+            current_user = get_or_create_user_from_clerk(db, payload)
+        except Exception as e:
+            logger.error(f"Token verification failed: {e}")
 
     if not current_user:
         await websocket.send_json({
@@ -516,7 +570,9 @@ async def websocket_endpoint(
                         session_id=session_id,
                         project_id=str(project.id) if project else None,
                         result=result,
-                        save_asset=save_asset
+                        save_asset=save_asset,
+                        langsmith_trace_id=result.get("langsmith_trace_id"),
+                        langsmith_parent_run_id=result.get("langsmith_parent_run_id")
                     )
                 else:
                     ai_message = Message(

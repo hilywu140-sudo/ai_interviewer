@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useChat } from '@/hooks/useChat'
 import { ChatHeader } from '@/components/chat/ChatHeader'
@@ -15,7 +15,10 @@ import { assetsApi } from '@/lib/api-client'
 export default function ChatPage() {
   const params = useParams()
   const router = useRouter()
-  const sessionId = params.sessionId as string
+  const initialSessionId = params.sessionId as string
+
+  // 本地管理 sessionId，避免路由跳转导致页面重新挂载
+  const [currentSessionId, setCurrentSessionId] = useState(initialSessionId)
 
   const {
     state,
@@ -27,8 +30,9 @@ export default function ChatPage() {
     cancelRecording,
     cancelGeneration,
     clearNewAssetId,
-    confirmSave
-  } = useChat(sessionId)
+    confirmSave,
+    toggleLike
+  } = useChat(currentSessionId)
 
   const {
     isConnected,
@@ -128,9 +132,27 @@ export default function ChatPage() {
     setMessageContext(null)
   }
 
+  // 切换会话：更新本地状态 + URL（不触发页面重新挂载）
   const handleSessionChange = (newSessionId: string) => {
-    router.push(`/chat/${newSessionId}`)
+    if (newSessionId !== currentSessionId) {
+      setCurrentSessionId(newSessionId)
+      window.history.replaceState(null, '', `/chat/${newSessionId}`)
+    }
   }
+
+  // 监听浏览器前进/后退
+  useEffect(() => {
+    const handlePopState = () => {
+      const pathParts = window.location.pathname.split('/')
+      const urlSessionId = pathParts[pathParts.length - 1]
+      if (urlSessionId && urlSessionId !== currentSessionId) {
+        setCurrentSessionId(urlSessionId)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [currentSessionId])
 
   const handleSendMessage = (content: string) => {
     sendMessage(content)
@@ -150,7 +172,7 @@ export default function ChatPage() {
       {projectId && (
         <ChatSidebar
           projectId={projectId}
-          currentSessionId={sessionId}
+          currentSessionId={currentSessionId}
           isOpen={isSidebarOpen}
           onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
           onFillInput={handleFillInput}
@@ -191,6 +213,7 @@ export default function ChatPage() {
           onSubmitAudio={submitAudio}
           onEditAsset={handleEditAsset}
           onConfirmSave={confirmSave}
+          onLikeMessage={toggleLike}
         />
 
         {/* 输入区域 */}

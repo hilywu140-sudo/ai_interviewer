@@ -225,7 +225,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
                       <textarea
                         value={editedTranscript}
                         onChange={(e) => setEditedTranscript(e.target.value)}
-                        className="w-full h-48 text-sm text-ink-200 bg-cream-100 rounded-card p-4 border-0
+                        className="w-full h-48 text-sm text-ink-200 bg-cream-50 rounded-card p-4 border-0
                                    focus:ring-1 focus:ring-warm-200 focus:outline-none resize-y font-mono"
                         placeholder="支持 Markdown 格式..."
                         disabled={isSaving}
@@ -252,7 +252,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
                       </div>
                     </div>
                   ) : (
-                    <div className="text-sm text-ink-100 bg-cream-100 rounded-card p-4 prose prose-sm max-w-none prose-warm">
+                    <div className="text-sm text-ink-100 bg-cream-50 rounded-card p-4 prose prose-sm max-w-none prose-warm">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {currentAsset.transcript}
                       </ReactMarkdown>
@@ -265,7 +265,7 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               {currentAsset.star_structure?.analysis && (
                 <div className="mb-6">
                   <h3 className="font-medium text-sm text-ink-50 mb-2">STAR 分析</h3>
-                  <div className="text-xs text-ink-100 bg-cream-100 rounded-card p-4 whitespace-pre-wrap leading-relaxed">
+                  <div className="text-xs text-ink-100 bg-cream-50 rounded-card p-4 whitespace-pre-wrap leading-relaxed">
                     {currentAsset.star_structure.analysis}
                   </div>
                 </div>
@@ -289,16 +289,6 @@ export function AssetDetailPanel({ asset, onClose, onUpdate, onDelete }: AssetDe
               )}
             </>
           )}
-        </div>
-
-        {/* 底部 */}
-        <div className="px-6 py-4 border-t border-cream-300 flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-cream-400 hover:text-ink-200 hover:bg-cream-200 rounded-button transition-all"
-          >
-            关闭
-          </button>
         </div>
       </div>
     </div>

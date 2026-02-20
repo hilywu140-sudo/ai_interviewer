@@ -3,6 +3,7 @@
 import { useState, KeyboardEvent, useEffect, useRef } from 'react'
 import { QuickActions } from '@/components/ui/QuickActions'
 import { MessageContext } from '@/lib/types'
+import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
 interface ChatInputProps {
   onSendMessage: (content: string) => void
@@ -67,6 +68,12 @@ export function ChatInput({
   const handleSend = () => {
     const trimmed = input.trim()
     if (trimmed && !disabled) {
+      // 埋点：消息发送
+      analytics.track(AnalyticsEvents.MESSAGE_SEND, {
+        input_length: trimmed.length,
+        has_context: !!messageContext,
+      })
+
       onSendMessage(trimmed)
       setInput('')
       setShowHint(false)
@@ -115,6 +122,15 @@ export function ChatInput({
   const handleClearContext = () => {
     setInput('')  // 清空输入框
     onClearContext?.()
+  }
+
+  // 处理停止生成
+  const handleStop = () => {
+    // 埋点：停止生成
+    analytics.track(AnalyticsEvents.MESSAGE_STOP, {
+      partial_length: input.length,
+    })
+    onStop?.()
   }
 
   // 计算发送按钮是否可用
@@ -181,7 +197,7 @@ export function ChatInput({
               {/* 发送/停止按钮 - 在输入框内部右侧 */}
               {showStopButton ? (
                 <button
-                  onClick={onStop}
+                  onClick={handleStop}
                   className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-rose-300 hover:bg-rose-200
                              text-cream-50 transition-all duration-200
                              flex items-center justify-center"

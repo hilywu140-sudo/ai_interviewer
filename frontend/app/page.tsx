@@ -63,7 +63,7 @@ const features = [
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen flex flex-col items-center justify-center bg-cream-100 overflow-hidden">
+    <main className="relative min-h-screen flex flex-col items-center justify-center bg-cream-50 overflow-hidden">
 
       {/* ── Decorative background elements ── */}
 

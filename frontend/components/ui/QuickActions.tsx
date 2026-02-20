@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
 interface QuickAction {
   id: string
@@ -94,6 +95,13 @@ export function QuickActions({ onSelect, disabled = false, resetTrigger }: Quick
     // 切换选中状态：再次点击同一个按钮则取消选中
     const newId = activeId === action.id ? null : action.id
     setActiveId(newId)
+
+    // 埋点：快捷按钮点击
+    analytics.track(AnalyticsEvents.QUICK_ACTION_CLICK, {
+      action_type: action.id,
+      action_label: action.label,
+    })
+
     onSelect(action.prompt)
   }
 

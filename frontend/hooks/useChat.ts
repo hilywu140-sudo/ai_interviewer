@@ -16,7 +16,8 @@ import {
   MessageContext
 } from '@/lib/types'
 import { messagesApi, audioApi, sessionsApi, assetsApi } from '@/lib/api-client'
-import { getToken } from '@/lib/auth-api'
+import { getClerkToken } from '@/lib/clerk-token'
+import { analytics, AnalyticsEvents, performanceTiming } from '@/lib/analytics'
 
 interface UseChatReturn {
   state: ChatState & {
@@ -42,6 +43,7 @@ interface UseChatReturn {
   loadMoreHistory: () => Promise<void>
   clearNewAssetId: () => void  // 清除新 Asset 高亮
   confirmSave: (messageId: string) => Promise<void>  // 确认保存（按消息ID）
+  toggleLike: (messageId: string) => Promise<void>  // 切换点赞
 }
 
 const initialRecordingState: RecordingState = {
@@ -97,6 +99,7 @@ export function useChat(sessionId: string): UseChatReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const streamingContentRef = useRef<string>('')  // 用于在回调中获取最新的流式内容
+  const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null)  // 防抖连接
 
   // 同步 streamingContent 到 ref
   useEffect(() => {
@@ -150,6 +153,11 @@ export function useChat(sessionId: string): UseChatReturn {
       chatMsg.saveStatus = 'unsaved'
     } else if (msg.meta?.saved) {
       chatMsg.saveStatus = 'saved'
+    }
+
+    // 从 meta 中读取点赞状态
+    if (msg.meta?.liked) {
+      chatMsg.liked = true
     }
 
     // 如果有音频文件ID，获取签名URL
@@ -256,278 +264,333 @@ export function useChat(sessionId: string): UseChatReturn {
     loadHistory()
   }, [loadHistory])
 
-  // 连接 WebSocket
+  // 连接 WebSocket（支持 sessionId 变化时平滑切换）
   useEffect(() => {
     if (!sessionId) return
 
-    // 获取 Token 用于 WebSocket 认证
-    const token = getToken()
-    if (!token) {
-      console.error('No auth token, cannot connect WebSocket')
-      return
+    // 清除之前的防抖定时器
+    if (connectTimeoutRef.current) {
+      clearTimeout(connectTimeoutRef.current)
     }
 
-    // 使用环境变量配置 WebSocket URL
-    const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8001'
-    const wsUrl = `${wsBaseUrl}/ws/chat/${sessionId}?token=${encodeURIComponent(token)}`
-    const ws = new WebSocket(wsUrl)
-
-    ws.onopen = () => {
-      console.log('WebSocket connected')
-      setIsConnected(true)
+    // 关闭旧连接
+    if (wsRef.current) {
+      wsRef.current.close()
+      wsRef.current = null
     }
 
-    ws.onmessage = (event) => {
-      const message: ServerMessage = JSON.parse(event.data)
-      console.log('WebSocket message:', message)
+    // 重置状态（切换会话时清空）
+    setMessages([])
+    setAgentStatus('idle')
+    setRecordingState(initialRecordingState)
+    setTranscription(initialTranscriptionState)
+    setIsStreaming(false)
+    setStreamingContent('')
+    setIsFeedbackStreaming(false)
+    setFeedbackStreamingContent('')
+    setHistoryLoaded(false)
+    setHistoryOffset(0)
+    setHasMoreHistory(true)
+    setIsSubmitted(false)
+    setPendingQuery('')
+    setMessageContext(null)
 
-      // 更新 Agent 状态
-      if (message.agent_status) {
-        setCurrentAgent(message.agent_status.current_agent as CurrentAgent)
-        setAgentStatus(message.agent_status.status as AgentStatus)
+    // 防抖：延迟 50ms 建立新连接，避免快速切换时的竞态
+    connectTimeoutRef.current = setTimeout(async () => {
+      // 获取 Clerk Token 用于 WebSocket 认证
+      const token = await getClerkToken()
+      if (!token) {
+        console.error('No auth token, cannot connect WebSocket')
+        return
       }
 
-      // 根据消息类型处理
-      switch (message.type) {
-        case 'assistant_message':
-          setAgentStatus('idle')
-          setMessages((prev) => [...prev, {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: message.content || '',
-            type: 'text',
-            assetId: message.asset_id,  // 支持关联 Asset
-            timestamp: message.timestamp
-          }])
-          break
+      // 使用环境变量配置 WebSocket URL
+      const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8001'
+      const wsUrl = `${wsBaseUrl}/ws/chat/${sessionId}?token=${encodeURIComponent(token)}`
+      const ws = new WebSocket(wsUrl)
 
-        // 流式消息处理
-        case 'assistant_message_stream_start':
-          setIsStreaming(true)
-          setStreamingContent('')
-          setAgentStatus('idle')  // 流式开始后停止3点动画
-          break
+      ws.onopen = () => {
+        console.log('WebSocket connected')
+        setIsConnected(true)
+      }
 
-        case 'assistant_message_chunk':
-          setStreamingContent(prev => prev + (message.content || ''))
-          break
+      ws.onmessage = (event) => {
+        const message: ServerMessage = JSON.parse(event.data)
+        console.log('WebSocket message:', message)
 
-        case 'assistant_message_stream_end':
-          setIsStreaming(false)
-          setAgentStatus('idle')
-          // 将完整消息添加到消息列表（使用后端返回的 message_id）
-          const streamEndMsgId = (message as any).message_id || generateMessageId()
-          const streamEndMsg: ChatMessage = {
-            id: streamEndMsgId,
-            role: 'assistant',
-            content: message.full_content || streamingContent,
-            type: 'text',
-            assetId: message.asset_id,  // 关联保存的 Asset
-            timestamp: message.timestamp
-          }
-          // 如果有待保存数据，绑定到消息上
-          if (message.pending_save) {
-            streamEndMsg.pendingSave = {
-              ...message.pending_save,
-              messageId: streamEndMsgId
-            }
-            streamEndMsg.saveStatus = 'unsaved'
-          }
-          setMessages((prev) => [...prev, streamEndMsg])
-          setStreamingContent('')
-          // 如果有新保存的 Asset，通知侧边栏高亮
-          if (message.asset_id) {
-            setNewAssetId(message.asset_id)
-          }
-          break
+        // 更新 Agent 状态
+        if (message.agent_status) {
+          setCurrentAgent(message.agent_status.current_agent as CurrentAgent)
+          setAgentStatus(message.agent_status.status as AgentStatus)
+        }
 
-        case 'recording_start':
-          // AI要求开始录音，自动弹出录音卡片
-          setAgentStatus('recording')
-          const question = message.recording?.question || ''
-          setRecordingState({
-            isActive: true,
-            isRecording: false,  // 用户需要手动开始
-            question,
-            duration: 0
-          })
-          // 添加录音提示消息
-          setMessages((prev) => [...prev, {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: '请点击下方按钮开始录音回答',
-            type: 'recording_prompt',
-            question,
-            timestamp: message.timestamp
-          }])
-          break
-
-        case 'transcription':
-          console.log('>>> 收到 transcription 消息:', message.timestamp)
-          setAgentStatus('transcribing')
-          setTranscription({
-            text: message.transcription?.text || null,
-            isFinal: message.transcription?.is_final || false
-          })
-          if (message.transcription?.is_final) {
-            // 转录完成，立即添加用户语音消息（含音频文件ID和句子时间戳）
-            const userVoiceMsgId = generateMessageId()
-            const userVoiceMsg: ChatMessage = {
-              id: userVoiceMsgId,
-              role: 'user',
-              content: message.transcription?.text || '',
-              type: 'audio',
-              transcription: message.transcription?.text,
-              transcriptSentences: message.transcript_sentences,  // 带时间戳的句子
-              audioFileId: message.audio_file_id,  // 音频文件ID
-              audioUrl: audioPreviewUrlRef.current || undefined,  // 先用本地预览URL
-              timestamp: message.timestamp
-            }
-            console.log('>>> 添加用户语音消息:', userVoiceMsgId, 'previewUrl:', !!audioPreviewUrlRef.current)
-            setMessages((prev) => [...prev, userVoiceMsg])
-
-            // 如果有音频文件ID，获取服务端签名URL替换本地预览
-            if (message.audio_file_id) {
-              audioApi.getUrl(message.audio_file_id)
-                .then(({ url }) => {
-                  setMessages(prev => prev.map(m =>
-                    m.id === userVoiceMsgId ? { ...m, audioUrl: url } : m
-                  ))
-                })
-                .catch(e => console.error('获取音频 URL 失败:', e))
-            }
-
-            setAgentStatus('analyzing')  // 显示3点等待动画
-          }
-          break
-
-        // 流式反馈消息处理
-        case 'feedback_stream_start':
-          console.log('>>> 收到 feedback_stream_start 消息')
-          setIsFeedbackStreaming(true)
-          setFeedbackStreamingContent('')
-          setAgentStatus('idle')  // 流式开始后停止3点动画
-          break
-
-        case 'feedback_chunk':
-          setFeedbackStreamingContent(prev => prev + (message.content || ''))
-          break
-
-        case 'feedback_stream_end':
-          console.log('>>> 收到 feedback_stream_end 消息:', message.timestamp)
-          setIsFeedbackStreaming(false)
-          setFeedbackStreamingContent('')
-          setAgentStatus('idle')
-          setRecordingState(initialRecordingState)
-          setTranscription(initialTranscriptionState)
-          setIsSubmitted(false)
-
-          // 添加反馈消息
-          const feedbackStreamEndMsg: ChatMessage = {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: message.full_content || feedbackStreamingContent || '分析完成',
-            type: 'feedback',
-            feedback: message.feedback,
-            assetId: message.asset_id,
-            timestamp: message.timestamp
-          }
-          setMessages((prev) => [...prev, feedbackStreamEndMsg])
-          break
-
-        case 'feedback':
-          console.log('>>> 收到 feedback 消息:', message.timestamp)
-          setAgentStatus('idle')
-          setRecordingState(initialRecordingState)
-          setTranscription(initialTranscriptionState)
-          setIsSubmitted(false)  // 重置提交状态
-
-          // 添加反馈消息（使用 XML 格式的 content）
-          const feedbackMsg: ChatMessage = {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: message.content || message.feedback?.raw_content || '分析完成',
-            type: 'feedback',
-            feedback: message.feedback,
-            assetId: message.asset_id,
-            timestamp: message.timestamp
-          }
-
-          setMessages((prev) => [...prev, feedbackMsg])
-          break
-
-        case 'error':
-          setAgentStatus('idle')
-          setRecordingState(initialRecordingState)
-          setIsStreaming(false)
-          setStreamingContent('')
-          console.error('WebSocket error:', message.error || message.content)
-          setMessages((prev) => [...prev, {
-            id: generateMessageId(),
-            role: 'assistant',
-            content: message.error || message.content || '发生错误，请重试',
-            type: 'text',
-            timestamp: message.timestamp
-          }])
-          break
-
-        case 'generation_cancelled':
-          // 服务端确认取消，保留已生成的内容
-          console.log('Generation cancelled by server, partial_content:', message.partial_content, 'streamingContentRef:', streamingContentRef.current)
-          setAgentStatus('idle')
-          setIsStreaming(false)
-
-          // 获取已生成的部分内容（优先使用服务端返回的，否则使用本地流式内容 ref）
-          const partialContent = message.partial_content || streamingContentRef.current
-
-          if (partialContent) {
-            // 保留已生成的内容，并添加暂停提示
-            setMessages((prev) => [...prev, {
-              id: generateMessageId(),
-              role: 'assistant',
-              content: partialContent,
-              type: 'text',
-              timestamp: message.timestamp,
-              isCancelled: true  // 标记为已取消的消息
-            }])
-          }
-
-          setStreamingContent('')
-          break
-
-        default:
-          console.warn('Unknown message type:', message.type, message)
-          // 如果有 content，仍然显示
-          if (message.content) {
+        // 根据消息类型处理
+        switch (message.type) {
+          case 'assistant_message':
+            setAgentStatus('idle')
             setMessages((prev) => [...prev, {
               id: generateMessageId(),
               role: 'assistant',
               content: message.content || '',
               type: 'text',
+              assetId: message.asset_id,  // 支持关联 Asset
               timestamp: message.timestamp
             }])
-          }
-          setAgentStatus('idle')
-          break
+            break
+
+          // 流式消息处理
+          case 'assistant_message_stream_start':
+            // 埋点：首字响应时间
+            performanceTiming.markEndAndTrack('ttft_chat', AnalyticsEvents.TTFT_CHAT_STREAM)
+
+            setIsStreaming(true)
+            setStreamingContent('')
+            setAgentStatus('idle')  // 流式开始后停止3点动画
+            break
+
+          case 'assistant_message_chunk':
+            setStreamingContent(prev => prev + (message.content || ''))
+            break
+
+          case 'assistant_message_stream_end':
+            // 埋点：完整响应时间
+            performanceTiming.markEndAndTrack('response_total', AnalyticsEvents.RESPONSE_TOTAL_DURATION)
+
+            setIsStreaming(false)
+            setAgentStatus('idle')
+            // 将完整消息添加到消息列表（使用后端返回的 message_id）
+            const streamEndMsgId = (message as any).message_id || generateMessageId()
+            const streamEndMsg: ChatMessage = {
+              id: streamEndMsgId,
+              role: 'assistant',
+              content: message.full_content || streamingContent,
+              type: 'text',
+              assetId: message.asset_id,  // 关联保存的 Asset
+              timestamp: message.timestamp
+            }
+            // 如果有待保存数据，绑定到消息上
+            if (message.pending_save) {
+              streamEndMsg.pendingSave = {
+                ...message.pending_save,
+                messageId: streamEndMsgId
+              }
+              streamEndMsg.saveStatus = 'unsaved'
+            }
+            setMessages((prev) => [...prev, streamEndMsg])
+            setStreamingContent('')
+            // 如果有新保存的 Asset，通知侧边栏高亮
+            if (message.asset_id) {
+              setNewAssetId(message.asset_id)
+            }
+            break
+
+          case 'recording_start':
+            // AI要求开始录音，自动弹出录音卡片
+            setAgentStatus('recording')
+            const question = message.recording?.question || ''
+            setRecordingState({
+              isActive: true,
+              isRecording: false,  // 用户需要手动开始
+              question,
+              duration: 0
+            })
+            // 添加录音提示消息
+            setMessages((prev) => [...prev, {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: '请点击下方按钮开始录音回答',
+              type: 'recording_prompt',
+              question,
+              timestamp: message.timestamp
+            }])
+            break
+
+          case 'transcription':
+            console.log('>>> 收到 transcription 消息:', message.timestamp)
+            setAgentStatus('transcribing')
+            setTranscription({
+              text: message.transcription?.text || null,
+              isFinal: message.transcription?.is_final || false
+            })
+            if (message.transcription?.is_final) {
+              // 转录完成，立即添加用户语音消息（含音频文件ID和句子时间戳）
+              const userVoiceMsgId = generateMessageId()
+              const userVoiceMsg: ChatMessage = {
+                id: userVoiceMsgId,
+                role: 'user',
+                content: message.transcription?.text || '',
+                type: 'audio',
+                transcription: message.transcription?.text,
+                transcriptSentences: message.transcript_sentences,  // 带时间戳的句子
+                audioFileId: message.audio_file_id,  // 音频文件ID
+                audioUrl: audioPreviewUrlRef.current || undefined,  // 先用本地预览URL
+                timestamp: message.timestamp
+              }
+              console.log('>>> 添加用户语音消息:', userVoiceMsgId, 'previewUrl:', !!audioPreviewUrlRef.current)
+              setMessages((prev) => [...prev, userVoiceMsg])
+
+              // 如果有音频文件ID，获取服务端签名URL替换本地预览
+              if (message.audio_file_id) {
+                audioApi.getUrl(message.audio_file_id)
+                  .then(({ url }) => {
+                    setMessages(prev => prev.map(m =>
+                      m.id === userVoiceMsgId ? { ...m, audioUrl: url } : m
+                    ))
+                  })
+                  .catch(e => console.error('获取音频 URL 失败:', e))
+              }
+
+              setAgentStatus('analyzing')  // 显示3点等待动画
+            }
+            break
+
+          // 流式反馈消息处理
+          case 'feedback_stream_start':
+            console.log('>>> 收到 feedback_stream_start 消息')
+            // 埋点：反馈首字响应时间
+            performanceTiming.markEndAndTrack('ttft_feedback', AnalyticsEvents.TTFT_FEEDBACK)
+
+            setIsFeedbackStreaming(true)
+            setFeedbackStreamingContent('')
+            setAgentStatus('idle')  // 流式开始后停止3点动画
+            break
+
+          case 'feedback_chunk':
+            setFeedbackStreamingContent(prev => prev + (message.content || ''))
+            break
+
+          case 'feedback_stream_end':
+            console.log('>>> 收到 feedback_stream_end 消息:', message.timestamp)
+            // 埋点：录音到反馈完成时间
+            performanceTiming.markEndAndTrack('recording_to_feedback', AnalyticsEvents.RECORDING_TO_FEEDBACK)
+
+            setIsFeedbackStreaming(false)
+            setFeedbackStreamingContent('')
+            setAgentStatus('idle')
+            setRecordingState(initialRecordingState)
+            setTranscription(initialTranscriptionState)
+            setIsSubmitted(false)
+
+            // 添加反馈消息
+            const feedbackStreamEndMsg: ChatMessage = {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: message.full_content || feedbackStreamingContent || '分析完成',
+              type: 'feedback',
+              feedback: message.feedback,
+              assetId: message.asset_id,
+              timestamp: message.timestamp
+            }
+            setMessages((prev) => [...prev, feedbackStreamEndMsg])
+            break
+
+          case 'feedback':
+            console.log('>>> 收到 feedback 消息:', message.timestamp)
+            setAgentStatus('idle')
+            setRecordingState(initialRecordingState)
+            setTranscription(initialTranscriptionState)
+            setIsSubmitted(false)  // 重置提交状态
+
+            // 添加反馈消息（使用 XML 格式的 content）
+            const feedbackMsg: ChatMessage = {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: message.content || message.feedback?.raw_content || '分析完成',
+              type: 'feedback',
+              feedback: message.feedback,
+              assetId: message.asset_id,
+              timestamp: message.timestamp
+            }
+
+            setMessages((prev) => [...prev, feedbackMsg])
+            break
+
+          case 'error':
+            setAgentStatus('idle')
+            setRecordingState(initialRecordingState)
+            setIsStreaming(false)
+            setStreamingContent('')
+            console.error('WebSocket error:', message.error || message.content)
+            setMessages((prev) => [...prev, {
+              id: generateMessageId(),
+              role: 'assistant',
+              content: message.error || message.content || '发生错误，请重试',
+              type: 'text',
+              timestamp: message.timestamp
+            }])
+            break
+
+          case 'generation_cancelled':
+            // 服务端确认取消，保留已生成的内容
+            console.log('Generation cancelled by server, partial_content:', message.partial_content, 'streamingContentRef:', streamingContentRef.current)
+            setAgentStatus('idle')
+            setIsStreaming(false)
+
+            // 获取已生成的部分内容（优先使用服务端返回的，否则使用本地流式内容 ref）
+            const partialContent = message.partial_content || streamingContentRef.current
+
+            if (partialContent) {
+              // 保留已生成的内容，并添加暂停提示
+              setMessages((prev) => [...prev, {
+                id: generateMessageId(),
+                role: 'assistant',
+                content: partialContent,
+                type: 'text',
+                timestamp: message.timestamp,
+                isCancelled: true  // 标记为已取消的消息
+              }])
+            }
+
+            setStreamingContent('')
+            break
+
+          default:
+            console.warn('Unknown message type:', message.type, message)
+            // 如果有 content，仍然显示
+            if (message.content) {
+              setMessages((prev) => [...prev, {
+                id: generateMessageId(),
+                role: 'assistant',
+                content: message.content || '',
+                type: 'text',
+                timestamp: message.timestamp
+              }])
+            }
+            setAgentStatus('idle')
+            break
+        }
       }
-    }
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error)
-    }
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+        // 埋点：WebSocket 错误
+        analytics.track(AnalyticsEvents.STREAM_ERROR, {
+          error_message: 'WebSocket error',
+        })
+      }
 
-    ws.onclose = () => {
-      console.log('WebSocket disconnected')
-      setIsConnected(false)
-    }
+      ws.onclose = () => {
+        console.log('WebSocket disconnected')
+        // 埋点：WebSocket 断开
+        analytics.track(AnalyticsEvents.WEBSOCKET_DISCONNECT, {
+          session_id: sessionId,
+        })
+        setIsConnected(false)
+      }
 
-    wsRef.current = ws
+      wsRef.current = ws
+    }, 50)  // 50ms 防抖
 
     return () => {
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current)
+      }
       if (recordingTimerRef.current) {
         clearInterval(recordingTimerRef.current)
       }
-      ws.close()
+      if (wsRef.current) {
+        wsRef.current.close()
+      }
     }
   }, [sessionId])
 
@@ -535,6 +598,10 @@ export function useChat(sessionId: string): UseChatReturn {
   const sendMessage = useCallback((content: string, context?: MessageContext) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const timestamp = new Date().toISOString()
+
+      // 埋点：开始计时
+      performanceTiming.markStart('ttft_chat')
+      performanceTiming.markStart('response_total')
 
       // 保存用户输入（用于取消后恢复）
       setPendingQuery(content)
@@ -573,6 +640,10 @@ export function useChat(sessionId: string): UseChatReturn {
   const submitAudio = useCallback((audioData: string, previewUrl?: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const timestamp = new Date().toISOString()
+
+      // 埋点：开始计时（录音到反馈）
+      performanceTiming.markStart('ttft_feedback')
+      performanceTiming.markStart('recording_to_feedback')
 
       wsRef.current.send(JSON.stringify({
         type: 'audio',
@@ -736,6 +807,21 @@ export function useChat(sessionId: string): UseChatReturn {
     }
   }, [messages])
 
+  // 切换消息点赞状态
+  const toggleLike = useCallback(async (messageId: string) => {
+    try {
+      const result = await messagesApi.toggleLike(messageId)
+      // 更新本地消息状态
+      setMessages(prev => prev.map(msg =>
+        msg.id === messageId
+          ? { ...msg, liked: result.liked }
+          : msg
+      ))
+    } catch (error) {
+      console.error('点赞失败:', error)
+    }
+  }, [])
+
   return {
     state,
     sendMessage,
@@ -748,5 +834,6 @@ export function useChat(sessionId: string): UseChatReturn {
     loadMoreHistory,
     clearNewAssetId,  // 清除高亮
     confirmSave,  // 确认保存（按消息ID）
+    toggleLike,  // 切换点赞
   }
 }

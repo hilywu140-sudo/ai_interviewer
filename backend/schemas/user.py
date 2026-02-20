@@ -9,7 +9,7 @@ from uuid import UUID
 
 
 class UserBase(BaseModel):
-    phone: str = Field(..., min_length=11, max_length=11, pattern=r"^1[3-9]\d{9}$")
+    email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
 
@@ -25,7 +25,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(BaseModel):
     id: UUID
-    phone: str
+    email: str
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
     is_active: bool
@@ -42,7 +42,7 @@ class UserResponse(BaseModel):
 class UserBriefResponse(BaseModel):
     """用户简要信息（用于列表等场景）"""
     id: UUID
-    phone: str
+    email: str
     nickname: Optional[str] = None
     avatar_url: Optional[str] = None
 

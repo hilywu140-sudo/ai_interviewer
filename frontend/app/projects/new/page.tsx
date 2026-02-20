@@ -38,7 +38,10 @@ export default function NewProjectPage() {
 
       // Step 3: 创建会话
       setStep('creating_session')
-      const session = await sessionsApi.create({ project_id: project.id })
+      const session = await sessionsApi.create({
+        project_id: project.id,
+        title: '练习室 1'
+      })
 
       // Step 4: 直接跳转到对话页面
       router.push(`/chat/${session.id}`)
@@ -63,7 +66,7 @@ export default function NewProjectPage() {
   }
 
   return (
-    <div className="min-h-screen bg-cream-100">
+    <div className="min-h-screen bg-cream-50">
       <div className="max-w-xl mx-auto px-6 py-12">
         {/* 头部 */}
         <motion.div
@@ -81,7 +84,7 @@ export default function NewProjectPage() {
             </svg>
           </button>
           <div>
-            <h1 className="font-serif text-xl text-ink-300 tracking-tight">创建新项目</h1>
+            <h1 className="text-xl text-ink-300 tracking-tight font-semibold">创建新项目</h1>
             <p className="text-sm text-ink-50 font-light mt-0.5">
               上传简历和职位描述，开始面试练习
             </p>
@@ -97,7 +100,7 @@ export default function NewProjectPage() {
         >
           {/* 项目名称 */}
           <div>
-            <label className="block font-serif text-sm text-ink-200 tracking-wide mb-3">
+            <label className="block text-sm text-ink-200 tracking-wide mb-3 font-medium">
               项目名称 <span className="text-rose-300">*</span>
             </label>
             <input
@@ -114,7 +117,7 @@ export default function NewProjectPage() {
 
           {/* 职位描述 */}
           <div>
-            <label className="block font-serif text-sm text-ink-200 tracking-wide mb-3">
+            <label className="block text-sm text-ink-200 tracking-wide mb-3 font-medium">
               职位描述 (JD) <span className="text-rose-300">*</span>
             </label>
             <textarea
