@@ -22,7 +22,7 @@ from services.websocket_manager import manager
 from services.callback_registry import register_callback, unregister_callback
 from agents.graph import process_message
 from agents.subagents.chat import chat_subagent, extract_optimized_answer
-from dependencies.auth import verify_clerk_token, get_or_create_user_from_clerk
+from dependencies.auth import verify_supabase_token, get_or_create_user_from_supabase
 
 logger = logging.getLogger(__name__)
 
@@ -316,12 +316,12 @@ async def websocket_endpoint(
     # 获取数据库会话
     db = next(get_db())
 
-    # 验证 Token (使用 Clerk JWT)
+    # 验证 Token (使用 Supabase JWT)
     current_user = None
     if token:
         try:
-            payload = await verify_clerk_token(token)
-            current_user = get_or_create_user_from_clerk(db, payload)
+            payload = await verify_supabase_token(token)
+            current_user = get_or_create_user_from_supabase(db, payload)
         except Exception as e:
             logger.error(f"Token verification failed: {e}")
 

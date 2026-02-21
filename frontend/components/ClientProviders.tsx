@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
-import { ClerkTokenProvider } from '@/components/ClerkTokenProvider'
+import { SupabaseAuthProvider } from '@/components/SupabaseAuthProvider'
 import { analytics } from '@/lib/analytics'
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
@@ -11,8 +11,8 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <ClerkTokenProvider>
+    <SupabaseAuthProvider>
       {children}
-    </ClerkTokenProvider>
+    </SupabaseAuthProvider>
   )
 }

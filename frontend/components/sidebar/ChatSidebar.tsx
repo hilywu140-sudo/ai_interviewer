@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Asset, Session, Project, MessageContext } from '@/lib/types'
 import { assetsApi, sessionsApi, projectsApi } from '@/lib/api-client'
-import { useUser, useClerk } from '@clerk/nextjs'
+import { useAuth } from '@/components/SupabaseAuthProvider'
 import { Avatar } from '@/components/ui/Avatar'
 import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
@@ -41,8 +41,7 @@ export function ChatSidebar({
   refreshKey
 }: ChatSidebarProps) {
   const router = useRouter()
-  const { user } = useUser()
-  const { signOut } = useClerk()
+  const { user, signOut } = useAuth()
   const [project, setProject] = useState<Project | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [assets, setAssets] = useState<Asset[]>([])
@@ -452,7 +451,7 @@ export function ChatSidebar({
             <div className="flex items-center gap-3">
               <Avatar type="user" size="sm" />
               <span className="text-sm text-ink-200">
-                {user?.firstName || maskEmail(user?.primaryEmailAddress?.emailAddress)}
+                {maskEmail(user?.email)}
               </span>
             </div>
             <button

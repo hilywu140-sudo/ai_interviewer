@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { projectsApi, sessionsApi } from '@/lib/api-client'
 import { Project } from '@/lib/types'
-import { useAuth } from '@clerk/nextjs'
+import { useAuth } from '@/components/SupabaseAuthProvider'
 import { motion } from 'framer-motion'
 
 export default function ProjectsPage() {

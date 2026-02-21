@@ -51,8 +51,9 @@ class Settings(BaseSettings):
     aliyun_dm_account_name: Optional[str] = None  # 发信地址
     aliyun_dm_from_alias: Optional[str] = None  # 发信人昵称
 
-    # Clerk 认证
-    clerk_secret_key: Optional[str] = None  # Clerk Secret Key (sk_test_xxx)
+    # Supabase 认证
+    supabase_url: Optional[str] = None
+    supabase_jwt_secret: Optional[str] = None
 
     @property
     def cors_origins_list(self) -> List[str]:

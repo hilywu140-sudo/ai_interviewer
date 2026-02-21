@@ -35,7 +35,9 @@
       "WebFetch(domain:pypi.org)",
       "Bash(test:*)",
       "Bash(timeout 5 python:*)",
-      "WebFetch(domain:docs.langchain.com)"
+      "WebFetch(domain:docs.langchain.com)",
+      "Bash(npm uninstall @clerk/nextjs @clerk/localizations)",
+      "Bash(PGPASSWORD=195101 psql:*)"
     ],
     "deny": [],
     "ask": []

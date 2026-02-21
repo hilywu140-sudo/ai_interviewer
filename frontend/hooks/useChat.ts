@@ -16,7 +16,7 @@ import {
   MessageContext
 } from '@/lib/types'
 import { messagesApi, audioApi, sessionsApi, assetsApi } from '@/lib/api-client'
-import { getClerkToken } from '@/lib/clerk-token'
+import { getSupabaseToken } from '@/lib/supabase-token'
 import { analytics, AnalyticsEvents, performanceTiming } from '@/lib/analytics'
 
 interface UseChatReturn {
@@ -297,8 +297,8 @@ export function useChat(sessionId: string): UseChatReturn {
 
     // 防抖：延迟 50ms 建立新连接，避免快速切换时的竞态
     connectTimeoutRef.current = setTimeout(async () => {
-      // 获取 Clerk Token 用于 WebSocket 认证
-      const token = await getClerkToken()
+      // 获取 Supabase Token 用于 WebSocket 认证
+      const token = await getSupabaseToken()
       if (!token) {
         console.error('No auth token, cannot connect WebSocket')
         return

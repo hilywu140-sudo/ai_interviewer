@@ -28,13 +28,8 @@ Base.metadata.create_all(bind=engine)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期管理"""
-    # 启动时预加载 Clerk JWKS
-    try:
-        from dependencies.auth import get_clerk_jwks_sync
-        get_clerk_jwks_sync()
-        print("[STARTUP] Clerk JWKS 预加载完成")
-    except Exception as e:
-        print(f"[STARTUP] Clerk JWKS 预加载失败: {e}")
+    # Supabase 使用 JWT Secret，无需预加载
+    print("[STARTUP] 应用启动完成")
 
     yield  # 应用运行中
 

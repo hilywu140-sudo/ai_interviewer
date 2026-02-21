@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { Project, ProjectCreate, Session, SessionCreate, Message, MessageListResponse, Asset, AssetCreate, AssetUpdate } from './types'
-import { getClerkToken } from './clerk-token'
+import { getSupabaseToken } from './supabase-token'
 
 // 使用空字符串作为 baseURL，让请求使用相对路径
 // Next.js 的 rewrites 会将 /api/* 重定向到 http://localhost:8001/api/*
@@ -14,10 +14,10 @@ const apiClient = axios.create({
   maxRedirects: 5, // 允许重定向
 })
 
-// 请求拦截器 - 添加 Clerk Token
+// 请求拦截器 - 添加 Supabase Token
 apiClient.interceptors.request.use(
   async (config) => {
-    const token = await getClerkToken()
+    const token = await getSupabaseToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -38,11 +38,11 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
 
-      // 等待一段时间让 Clerk 初始化完成
+      // 等待一段时间让 Supabase 初始化完成
       await new Promise(resolve => setTimeout(resolve, 500))
 
       // 重新获取 token
-      const token = await getClerkToken()
+      const token = await getSupabaseToken()
       if (token) {
         originalRequest.headers.Authorization = `Bearer ${token}`
         return apiClient.request(originalRequest)
