@@ -168,13 +168,13 @@ class SupervisorAgent:
             return result
         except json.JSONDecodeError as e:
             logger.warning(f"JSON解析失败: {e}, response: {response}")
-            # 返回默认值
+            # 返回默认值 - 判定为与面试无关
             return {
-                "intent": "general",
-                "next_agent": "chat",
+                "intent": "general_answer",
+                "next_agent": "end",
                 "extracted_question": None,
-                "response": None,
-                "reasoning": "JSON解析失败，默认路由到chat"
+                "response": "我是面试助手，只能帮助你准备面试相关的问题。",
+                "reasoning": "JSON解析失败，判定为与面试无关"
             }
 
     def _format_recent_history(self, messages: List[Dict[str, Any]]) -> str:

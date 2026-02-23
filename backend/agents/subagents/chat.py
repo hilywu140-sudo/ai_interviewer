@@ -16,7 +16,8 @@ from agents.prompts.chat import (
     ANSWER_OPTIMIZATION_WITH_REFERENCE_PROMPT,
     QUESTION_RESEARCH_PROMPT,
     RESUME_OPTIMIZATION_PROMPT,
-    SCRIPT_WRITING_PROMPT
+    SCRIPT_WRITING_PROMPT,
+    INTERVIEW_CHAT_PROMPT
 )
 from services.llm_service import llm_service
 
@@ -76,14 +77,14 @@ class ChatSubAgent:
         resume_text = state.get("resume_text", "")
 
         # 从 Supervisor 获取 intent 和 extracted_question
-        intent = state.get("intent", "general")
+        intent = state.get("intent", "interview_chat")
         extracted_question = state.get("extracted_question")
 
         # 验证 intent
-        valid_intents = ["answer_optimization", "question_research", "resume_optimization", "script_writing", "general"]
+        valid_intents = ["answer_optimization", "question_research", "resume_optimization", "script_writing", "interview_chat"]
         if intent not in valid_intents:
-            logger.warning(f"Unexpected intent '{intent}', falling back to 'general'")
-            intent = "general"
+            logger.warning(f"Unexpected intent '{intent}', falling back to 'interview_chat'")
+            intent = "interview_chat"
 
         # 简历优化需要检查是否有简历
         if intent == "resume_optimization" and not resume_text:
@@ -230,39 +231,6 @@ class ChatSubAgent:
 
         return await llm_service.chat_completion(messages=messages, temperature=0.7)
 
-    async def _general_chat(
-        self,
-        user_input: str,
-        resume_text: str,
-        jd_text: str,
-        previous_feedback: Dict[str, Any] | None,
-        state: AgentState,
-        extracted_question: str | None
-    ) -> str:
-        """通用面试相关对话"""
-        from services.context_manager import context_manager
-        from agents.prompts.chat import CHAT_SYSTEM_PROMPT_BASE
-
-        session_id = state.get("session_id", "")
-        context_summary = state.get("context_summary")
-
-        # 使用 ContextManager 构建上下文
-        context_result = await context_manager.build_context(
-            session_id=session_id,
-            system_prompt=CHAT_SYSTEM_PROMPT_BASE,
-            user_input=user_input,
-            jd_text=jd_text,
-            resume_text=resume_text,
-            existing_summary=context_summary
-        )
-
-        logger.debug(f"Chat 上下文 token 使用: {context_result.token_usage}")
-
-        return await llm_service.chat_completion(
-            messages=context_result.messages,
-            temperature=0.7
-        )
-
     # ========== 流式输出方法 ==========
 
     async def get_stream_generator(
@@ -312,9 +280,9 @@ class ChatSubAgent:
                 user_input, resume_text, jd_text, extracted_question
             ):
                 yield chunk
-        else:
-            async for chunk in self._general_chat_stream(
-                user_input, resume_text, jd_text, feedback, state, extracted_question
+        elif intent == "interview_chat":
+            async for chunk in self._interview_chat_stream(
+                user_input, resume_text, jd_text, state
             ):
                 yield chunk
 
@@ -458,28 +426,37 @@ class ChatSubAgent:
         async for chunk in llm_service.chat_completion_stream(messages=messages, temperature=0.7):
             yield chunk
 
-    async def _general_chat_stream(
+    async def _interview_chat_stream(
         self,
         user_input: str,
         resume_text: str,
         jd_text: str,
-        previous_feedback: Dict[str, Any] | None,
-        state: AgentState,
-        extracted_question: str | None
+        state: AgentState
     ) -> AsyncGenerator[str, None]:
-        """流式通用面试相关对话"""
+        """流式面试咨询对话"""
         from services.context_manager import context_manager
-        from agents.prompts.chat import CHAT_SYSTEM_PROMPT_BASE
 
         session_id = state.get("session_id", "")
         context_summary = state.get("context_summary")
 
+        # 构建背景信息
+        background_info = ""
+        if resume_text or jd_text:
+            background_info = "\n\n## 用户背景信息\n"
+            if jd_text:
+                background_info += f"\n**目标职位**:\n{jd_text[:1500]}\n"
+            if resume_text:
+                background_info += f"\n**用户简历摘要**:\n{resume_text[:1500]}\n"
+
+        system_prompt = INTERVIEW_CHAT_PROMPT + background_info
+
+        # 使用 ContextManager 构建上下文
         context_result = await context_manager.build_context(
             session_id=session_id,
-            system_prompt=CHAT_SYSTEM_PROMPT_BASE,
+            system_prompt=system_prompt,
             user_input=user_input,
-            jd_text=jd_text,
-            resume_text=resume_text,
+            jd_text="",  # 已经在 system_prompt 中包含
+            resume_text="",  # 已经在 system_prompt 中包含
             existing_summary=context_summary
         )
 
