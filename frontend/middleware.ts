@@ -2,12 +2,17 @@ import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // 定义公开路由（不需要登录）
-const publicRoutes = ['/', '/login']
+const publicRoutes = ['/', '/login', '/forgot-password', '/reset-password']
 
 function isPublicRoute(pathname: string): boolean {
-  return publicRoutes.some(route =>
-    pathname === route || pathname.startsWith('/login')
-  )
+  return publicRoutes.some(route => {
+    if (route === '/') {
+      // 首页只匹配精确路径
+      return pathname === '/'
+    }
+    // 其他路由匹配前缀
+    return pathname === route || pathname.startsWith(route + '/')
+  })
 }
 
 export async function middleware(request: NextRequest) {
