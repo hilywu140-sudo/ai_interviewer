@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, KeyboardEvent, useEffect, useRef } from 'react'
-import { QuickActions } from '@/components/ui/QuickActions'
 import { MessageContext } from '@/lib/types'
 import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
@@ -30,7 +29,6 @@ export function ChatInput({
 }: ChatInputProps) {
   const [internalInput, setInternalInput] = useState('')
   const [showHint, setShowHint] = useState(false)
-  const [quickActionResetTrigger, setQuickActionResetTrigger] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // 支持受控和非受控模式
@@ -77,7 +75,6 @@ export function ChatInput({
       onSendMessage(trimmed)
       setInput('')
       setShowHint(false)
-      setQuickActionResetTrigger(prev => prev + 1)
     }
   }
 
@@ -86,16 +83,6 @@ export function ChatInput({
       e.preventDefault()
       handleSend()
     }
-  }
-
-  const handleQuickAction = (prompt: string) => {
-    if (messageContext) {
-      // 有上下文时，将快捷按钮文字追加到前缀后面
-      setInput(prefix + prompt)
-    } else {
-      setInput(prompt)
-    }
-    setShowHint(true)
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -142,11 +129,6 @@ export function ChatInput({
     <div className="bg-white">
       {/* 输入区域 - 居中 */}
       <div className="flex flex-col items-center px-4 pb-4">
-        {/* 快捷按钮 - 居中对齐 */}
-        <div className="w-full max-w-2xl">
-          <QuickActions onSelect={handleQuickAction} disabled={disabled} resetTrigger={quickActionResetTrigger} />
-        </div>
-
         <div className="relative w-full max-w-2xl">
           {/* 上下文提示条（带取消按钮） */}
           {messageContext && (

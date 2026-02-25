@@ -710,6 +710,8 @@ async def websocket_endpoint(
                 continue
 
             elif message_type == "cancel_recording":
+                # 清除当前问题，避免下次消息仍被路由到 interviewer
+                current_question = None
                 # 标记最近的未提交 recording_prompt 消息为已取消
                 recording_prompt_msg = db.query(Message).filter(
                     Message.session_id == UUID(session_id),
