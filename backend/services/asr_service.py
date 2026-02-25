@@ -258,10 +258,10 @@ def build_context_text(
     parts = []
 
     if resume_text:
-        parts.append(f"面试候选人背景：\n{resume_text[:2000]}")
+        parts.append(f"面试候选人背景：\n{resume_text}")
 
     if jd_text:
-        parts.append(f"目标职位要求：\n{jd_text[:2000]}")
+        parts.append(f"目标职位要求：\n{jd_text}")
 
     if question:
         parts.append(f"面试问题：\n{question}")

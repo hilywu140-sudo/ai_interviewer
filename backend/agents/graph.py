@@ -5,6 +5,7 @@ LangGraph 图定义
 """
 
 import logging
+from datetime import datetime
 from typing import Literal
 from uuid import uuid4
 
@@ -293,13 +294,14 @@ async def process_message(
         }
 
     # 保存消息到历史
-    context_manager.add_message(session_id, "user", user_input)
+    context_manager.add_message(session_id, "user", user_input, timestamp=datetime.now().strftime("%m-%d %H:%M"))
     if result.get("response_text"):
         context_manager.add_message(
             session_id,
             "assistant",
             result["response_text"],
-            result.get("response_type")
+            result.get("response_type"),
+            timestamp=datetime.now().strftime("%m-%d %H:%M")
         )
 
     # 调试：打印最终结果中的关键字段

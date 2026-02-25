@@ -162,8 +162,8 @@ class ChatSubAgent:
         prompt = ANSWER_OPTIMIZATION_PROMPT.format(
             question=question or "（用户未指定具体问题）",
             original_answer=answer,
-            resume_text=resume_text[:2000] if resume_text else "无",
-            jd_text=jd_text[:2000] if jd_text else "无"
+            resume_text=resume_text if resume_text else "无",
+            jd_text=jd_text if jd_text else "无"
         )
 
         system_prompt = CHAT_SYSTEM_PROMPT
@@ -192,8 +192,8 @@ class ChatSubAgent:
 
         prompt = QUESTION_RESEARCH_PROMPT.format(
             question=question,
-            resume_text=resume_text[:2000] if resume_text else "无",
-            jd_text=jd_text[:2000] if jd_text else "无"
+            resume_text=resume_text if resume_text else "无",
+            jd_text=jd_text if jd_text else "无"
         )
 
         system_prompt = CHAT_SYSTEM_PROMPT
@@ -218,7 +218,7 @@ class ChatSubAgent:
 
         prompt = RESUME_OPTIMIZATION_PROMPT.format(
             resume_text=resume_text,
-            jd_text=jd_text[:2000] if jd_text else "无",
+            jd_text=jd_text if jd_text else "无",
             user_question=user_input
         )
 
@@ -324,8 +324,8 @@ class ChatSubAgent:
                 question=question or "（用户未指定具体问题）",
                 original_transcript=original_transcript,
                 user_edit=answer,
-                resume_text=resume_text[:2000] if resume_text else "无",
-                jd_text=jd_text[:2000] if jd_text else "无"
+                resume_text=resume_text if resume_text else "无",
+                jd_text=jd_text if jd_text else "无"
             )
             logger.info(f"使用带原始逐字稿参考的优化 Prompt，问题: {question}")
         else:
@@ -333,8 +333,8 @@ class ChatSubAgent:
             prompt = ANSWER_OPTIMIZATION_PROMPT.format(
                 question=question or "（用户未指定具体问题）",
                 original_answer=answer,
-                resume_text=resume_text[:2000] if resume_text else "无",
-                jd_text=jd_text[:2000] if jd_text else "无"
+                resume_text=resume_text if resume_text else "无",
+                jd_text=jd_text if jd_text else "无"
             )
 
         messages = [
@@ -359,8 +359,8 @@ class ChatSubAgent:
 
         prompt = QUESTION_RESEARCH_PROMPT.format(
             question=question,
-            resume_text=resume_text[:2000] if resume_text else "无",
-            jd_text=jd_text[:2000] if jd_text else "无"
+            resume_text=resume_text if resume_text else "无",
+            jd_text=jd_text if jd_text else "无"
         )
 
         messages = [
@@ -385,7 +385,7 @@ class ChatSubAgent:
 
         prompt = RESUME_OPTIMIZATION_PROMPT.format(
             resume_text=resume_text,
-            jd_text=jd_text[:2000] if jd_text else "无",
+            jd_text=jd_text if jd_text else "无",
             user_question=user_input
         )
 
@@ -415,7 +415,7 @@ class ChatSubAgent:
         prompt = SCRIPT_WRITING_PROMPT.format(
             question=question,
             resume_text=resume_text[:3000] if resume_text else "（未提供简历，将生成通用回答框架）",
-            jd_text=jd_text[:2000] if jd_text else "（未提供职位描述）"
+            jd_text=jd_text if jd_text else "（未提供职位描述）"
         )
 
         messages = [

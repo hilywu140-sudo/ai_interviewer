@@ -381,7 +381,8 @@ async def websocket_endpoint(
             {
                 "role": msg.role,
                 "content": msg.content,
-                "message_type": msg.message_type
+                "message_type": msg.message_type,
+                "timestamp": msg.created_at.strftime("%m-%d %H:%M") if msg.created_at else None
             }
             for msg in db_messages
         ]

@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Qwen (通义千问)
     qwen_api_key: Optional[str] = None
     qwen_base_url: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    qwen_supervisor_model: str = "qwen-long"  # Supervisor 使用的千问模型
+    qwen_supervisor_model: str = "qwen3.5-35b-a3b"  # Supervisor 使用的千问模型
 
     # LangSmith (可选)
     langsmith_api_key: Optional[str] = None

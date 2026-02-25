@@ -338,8 +338,8 @@ class InterviewerSubAgent:
         prompt = STAR_ANALYSIS_PROMPT.format(
             question=question,
             answer=answer,
-            resume_text=resume_text[:2000] if resume_text else "无",
-            jd_text=jd_text[:2000] if jd_text else "无"
+            resume_text=resume_text if resume_text else "无",
+            jd_text=jd_text if jd_text else "无"
         )
 
         messages = [

@@ -35,6 +35,7 @@ class Message:
     content: str
     token_count: int = 0
     message_type: Optional[str] = None  # "chat" | "voice_answer" | "feedback"
+    timestamp: Optional[str] = None  # 消息时间戳
 
 
 @dataclass
@@ -354,7 +355,10 @@ class ContextManager:
         messages.append({"role": "system", "content": enhanced_system})
 
         for msg in history:
-            messages.append({"role": msg.role, "content": msg.content})
+            content = msg.content
+            if msg.timestamp:
+                content = f"[{msg.timestamp}] {content}"
+            messages.append({"role": msg.role, "content": content})
 
         messages.append({"role": "user", "content": user_input})
 
@@ -365,7 +369,8 @@ class ContextManager:
         session_id: str,
         role: str,
         content: str,
-        message_type: Optional[str] = None
+        message_type: Optional[str] = None,
+        timestamp: Optional[str] = None
     ):
         """添加消息到会话历史"""
         if session_id not in self._session_history:
@@ -375,7 +380,8 @@ class ContextManager:
             role=role,
             content=content,
             token_count=self._count_tokens(content),
-            message_type=message_type
+            message_type=message_type,
+            timestamp=timestamp
         )
         self._session_history[session_id].append(msg)
 
@@ -399,7 +405,8 @@ class ContextManager:
                 role=m.get("role", "user"),
                 content=m.get("content", ""),
                 token_count=self._count_tokens(m.get("content", "")),
-                message_type=m.get("message_type")
+                message_type=m.get("message_type"),
+                timestamp=m.get("timestamp")
             )
             for m in messages
         ]
