@@ -45,16 +45,6 @@ const quickActions: QuickAction[] = [
     )
   },
   {
-    id: 'strategy',
-    label: '答题思路',
-    prompt: '面试官提问的作答思路是怎么样的',
-    icon: (
-      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-      </svg>
-    )
-  },
-  {
     id: 'optimize',
     label: '优化回答',
     prompt: '帮我优化回答',
@@ -106,7 +96,8 @@ export function QuickActions({ onSelect, disabled = false, resetTrigger }: Quick
   }
 
   return (
-    <div className="flex flex-wrap justify-center gap-2 px-4 py-3">
+    <div className="flex justify-center px-4 py-3">
+      <div className="w-full max-w-2xl flex flex-wrap justify-start gap-2">
       {quickActions.map((action) => {
         const isActive = activeId === action.id
         return (
@@ -131,6 +122,7 @@ export function QuickActions({ onSelect, disabled = false, resetTrigger }: Quick
           </button>
         )
       })}
+      </div>
     </div>
   )
 }
