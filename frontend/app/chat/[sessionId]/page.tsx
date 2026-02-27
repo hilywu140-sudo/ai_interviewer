@@ -6,6 +6,7 @@ import { useChat } from '@/hooks/useChat'
 import { ChatHeader } from '@/components/chat/ChatHeader'
 import { MessageList } from '@/components/chat/MessageList'
 import { ChatInput } from '@/components/chat/ChatInput'
+import { QuickActions } from '@/components/ui/QuickActions'
 import { OptimizedAnswerEditor } from '@/components/chat/OptimizedAnswerEditor'
 import { ChatSidebar } from '@/components/sidebar/ChatSidebar'
 import { AssetDetailPanel } from '@/components/sidebar/AssetDetailPanel'
@@ -67,6 +68,9 @@ export default function ChatPage() {
 
   // 输入框内容（用于取消后恢复）
   const [inputValue, setInputValue] = useState('')
+
+  // 快捷按钮重置触发器
+  const [quickActionResetTrigger, setQuickActionResetTrigger] = useState(0)
 
   // 是否禁用输入（录音中或处理中或流式输出中）
   const isInputDisabled = recordingState.isActive || agentStatus === 'thinking' || isStreaming
@@ -154,9 +158,15 @@ export default function ChatPage() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [currentSessionId])
 
+  // 处理快捷按钮选择
+  const handleQuickActionSelect = (prompt: string) => {
+    setInputValue(prompt)
+  }
+
   const handleSendMessage = (content: string) => {
     sendMessage(content)
     setInputValue('')  // 清空输入框
+    setQuickActionResetTrigger(prev => prev + 1)  // 重置快捷按钮选中状态
   }
 
   const handleStopGeneration = () => {
@@ -216,6 +226,13 @@ export default function ChatPage() {
           onLikeMessage={toggleLike}
         />
 
+        {/* 快捷按钮 */}
+        <QuickActions
+          onSelect={handleQuickActionSelect}
+          disabled={isInputDisabled}
+          resetTrigger={quickActionResetTrigger}
+        />
+
         {/* 输入区域 */}
         <ChatInput
           onSendMessage={handleSendMessage}
@@ -232,7 +249,7 @@ export default function ChatPage() {
               : isStreaming
               ? 'AI正在生成回复...'
               : agentStatus === 'thinking'
-              ? 'AI正在思考...'
+              ? '正在思考...'
               : messageContext
               ? '编辑后发送，AI将帮你优化这个回答'
               : '输入消息，或点击上方快捷按钮'

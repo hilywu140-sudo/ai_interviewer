@@ -94,7 +94,7 @@ export default function ProjectsPage() {
           transition={{ duration: 0.4, ease: 'easeOut' }}
           className="flex justify-between items-center mb-12"
         >
-          <h1 className="text-2xl text-ink-300 tracking-tight font-semibold">我的项目</h1>
+          <h1 className="text-2xl text-ink-300 tracking-tight font-semibold">我的面试练习项目</h1>
           <Link
             href="/projects/new"
             className="inline-flex items-center gap-2 px-5 py-2.5 border border-warm-300 text-warm-300 text-sm font-medium rounded-button hover:bg-warm-300 hover:text-white transition-all duration-300"

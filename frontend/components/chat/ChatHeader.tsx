@@ -78,7 +78,7 @@ export function ChatHeader({
 function getStatusText(status: AgentStatus): string {
   switch (status) {
     case 'thinking':
-      return 'AI正在思考'
+      return '正在思考'
     case 'recording':
       return '等待录音'
     case 'transcribing':

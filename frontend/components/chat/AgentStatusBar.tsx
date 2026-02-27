@@ -20,7 +20,7 @@ export function AgentStatusBar({ status }: AgentStatusBarProps) {
 function getStatusText(status: AgentStatus): string {
   switch (status) {
     case 'thinking':
-      return 'AI正在思考...'
+      return '正在思考...'
     case 'recording':
       return '等待您开始录音...'
     case 'transcribing':

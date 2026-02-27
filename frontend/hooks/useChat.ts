@@ -205,7 +205,7 @@ export function useChat(sessionId: string): UseChatReturn {
         setMessages([{
           id: generateMessageId(),
           role: 'assistant',
-          content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"我想练习xxx问题"  \n• **答案优化** - 说"帮我优化这个回答"  \n• **问题调研** - 说"这个问题怎么回答"  \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n直接输入你的需求，我会自动理解你的意图。',
+          content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"我想练习xxx问题"  \n• **答案优化** - 说"帮我优化这个回答"   \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n其他和面试有关的问题都可以和我聊一聊哦！',
           type: 'text',
           timestamp: new Date().toISOString()
         }])
@@ -222,7 +222,7 @@ export function useChat(sessionId: string): UseChatReturn {
       setMessages([{
         id: generateMessageId(),
         role: 'assistant',
-        content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"创建一个对话练习室，我想要练习xx问题"  \n• **答案优化** - 说"帮我优化xx问题的回答"  \n• **问题调研** - 说"xx问题应该怎么回答"  \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n直接输入你的需求，我会自动理解你的意图。',
+        content: '你好！我是你的AI面试助手。我可以帮你：\n\n• **语音练习** - 说"我想练习xxx问题"  \n• **答案优化** - 说"帮我优化这个回答"   \n• **写逐字稿** - 说"帮我写xxx问题的回答"  \n• **简历优化** - 说"帮我优化简历"\n\n其他和面试有关的问题都可以和我聊一聊哦！',
         type: 'text',
         timestamp: new Date().toISOString()
       }])
