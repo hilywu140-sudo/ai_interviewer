@@ -1,6 +1,6 @@
 import axios from 'axios'
 import { Project, ProjectCreate, Session, SessionCreate, Message, MessageListResponse, Asset, AssetCreate, AssetUpdate } from './types'
-import { getSupabaseToken } from './supabase-token'
+import { getAuthToken } from '@/components/AuthProvider'
 
 // 使用空字符串作为 baseURL，让请求使用相对路径
 // Next.js 的 rewrites 会将 /api/* 重定向到 http://localhost:8001/api/*
@@ -11,13 +11,13 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  maxRedirects: 5, // 允许重定向
+  maxRedirects: 5,
 })
 
-// 请求拦截器 - 添加 Supabase Token
+// 请求拦截器 - 添加 JWT Token
 apiClient.interceptors.request.use(
-  async (config) => {
-    const token = await getSupabaseToken()
+  (config) => {
+    const token = getAuthToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -28,27 +28,18 @@ apiClient.interceptors.request.use(
   }
 )
 
-// 响应拦截器 - 处理 401 错误（token 未就绪时自动重试）
+// 响应拦截器 - 处理 401 错误
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config
-
-    // 如果是 401 错误且还没有重试过
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      // 等待一段时间让 Supabase 初始化完成
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // 重新获取 token
-      const token = await getSupabaseToken()
-      if (token) {
-        originalRequest.headers.Authorization = `Bearer ${token}`
-        return apiClient.request(originalRequest)
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token 过期或无效，清除本地存储并跳转登录
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('auth_token')
+        localStorage.removeItem('auth_user')
+        window.location.href = '/login'
       }
     }
-
     return Promise.reject(error)
   }
 )

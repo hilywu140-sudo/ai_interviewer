@@ -113,6 +113,7 @@ class EmailService:
             send_request = dm_models.SingleSendMailRequest(
                 account_name=self.account_name,
                 address_type=1,
+                reply_to_address=False,
                 to_address=email,
                 subject="您的登录验证码",
                 html_body=self._build_email_body(code),

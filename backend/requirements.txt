@@ -32,8 +32,9 @@ websockets==14.1
 # Authentication
 python-jose[cryptography]==3.3.0
 
-# Aliyun SMS
+# Aliyun SMS & Email
 alibabacloud_dysmsapi20170525==3.0.0
+alibabacloud_dm20151123>=0.0.1
 alibabacloud_tea_openapi==0.3.11
 
 # Aliyun Services

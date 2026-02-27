@@ -9,8 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.8.0",
-    "@supabase/supabase-js": "^2.97.0",
     "@tailwindcss/typography": "^0.5.19",
     "axios": "^1.6.5",
     "framer-motion": "^12.34.0",

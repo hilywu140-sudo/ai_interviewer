@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Asset, Session, Project, MessageContext } from '@/lib/types'
 import { assetsApi, sessionsApi, projectsApi } from '@/lib/api-client'
-import { useAuth } from '@/components/SupabaseAuthProvider'
+import { useAuth } from '@/components/AuthProvider'
 import { Avatar } from '@/components/ui/Avatar'
 import { analytics, AnalyticsEvents } from '@/lib/analytics'
 
@@ -62,8 +62,8 @@ export function ChatSidebar({
   }
 
   // 退出登录
-  const handleLogout = async () => {
-    await signOut()
+  const handleLogout = () => {
+    signOut()
     router.push('/login')
   }
 

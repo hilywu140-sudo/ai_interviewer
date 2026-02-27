@@ -16,7 +16,6 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    supabase_user_id = Column(String(255), unique=True, nullable=True, index=True)  # Supabase 用户 ID
     email = Column(String(255), unique=True, nullable=False, index=True)
     nickname = Column(String(100), nullable=True)
     avatar_url = Column(String(500), nullable=True)

@@ -22,7 +22,8 @@ from services.websocket_manager import manager
 from services.callback_registry import register_callback, unregister_callback
 from agents.graph import process_message
 from agents.subagents.chat import chat_subagent, extract_optimized_answer
-from dependencies.auth import verify_supabase_token, get_or_create_user_from_supabase
+from dependencies.auth import get_user_from_token
+from services.auth_service import auth_service
 
 logger = logging.getLogger(__name__)
 
@@ -316,12 +317,14 @@ async def websocket_endpoint(
     # 获取数据库会话
     db = next(get_db())
 
-    # 验证 Token (使用 Supabase JWT)
+    # 验证 Token (使用自建 JWT)
     current_user = None
     if token:
         try:
-            payload = await verify_supabase_token(token)
-            current_user = get_or_create_user_from_supabase(db, payload)
+            valid, token_data, _ = auth_service.verify_token(token)
+            if valid and token_data:
+                from uuid import UUID as PyUUID
+                current_user = auth_service.get_user_by_id(db, PyUUID(token_data.sub))
         except Exception as e:
             logger.error(f"Token verification failed: {e}")
 

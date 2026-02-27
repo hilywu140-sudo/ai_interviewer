@@ -1,43 +1,36 @@
-import { updateSession } from '@/lib/supabase/middleware'
 import { NextResponse, type NextRequest } from 'next/server'
 
 // 定义公开路由（不需要登录）
-const publicRoutes = ['/', '/login', '/forgot-password', '/reset-password']
+const publicRoutes = ['/', '/login']
 
 function isPublicRoute(pathname: string): boolean {
   return publicRoutes.some(route => {
     if (route === '/') {
-      // 首页只匹配精确路径
       return pathname === '/'
     }
-    // 其他路由匹配前缀
     return pathname === route || pathname.startsWith(route + '/')
   })
 }
 
 export async function middleware(request: NextRequest) {
-  const { user, response } = await updateSession(request)
+  // 从 cookie 读取 token（SSR 场景下 localStorage 不可用，所以也检查 cookie）
+  const token = request.cookies.get('auth_token')?.value
 
-  // 如果不是公开路由且未登录，重定向到登录页
-  if (!isPublicRoute(request.nextUrl.pathname) && !user) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(loginUrl)
-  }
+  // 注意：因为我们用 localStorage 存 token，middleware 无法直接读到
+  // 所以不在 middleware 做强制重定向，而是在客户端组件中做路由守卫
+  // middleware 只做基于 cookie 的辅助检查
 
   // 如果已登录且访问登录页，重定向到项目页
-  if (isPublicRoute(request.nextUrl.pathname) && user && request.nextUrl.pathname.startsWith('/login')) {
+  if (token && request.nextUrl.pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/projects', request.url))
   }
 
-  return response
+  return NextResponse.next()
 }
 
 export const config = {
   matcher: [
-    // 跳过 Next.js 内部文件和静态文件
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    // 始终运行 API 路由
     '/(api|trpc)(.*)',
   ],
 }

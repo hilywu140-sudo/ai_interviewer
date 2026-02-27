@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { projectsApi, sessionsApi } from '@/lib/api-client'
 import { Project } from '@/lib/types'
-import { useAuth } from '@/components/SupabaseAuthProvider'
+import { useAuth } from '@/components/AuthProvider'
 import { motion } from 'framer-motion'
 
 export default function ProjectsPage() {
@@ -16,12 +16,12 @@ export default function ProjectsPage() {
   const [navigatingProjectId, setNavigatingProjectId] = useState<string | null>(null)
 
   useEffect(() => {
-    // 等待认证完成再加载项目，添加小延迟确保 token getter 已初始化
+    if (isLoaded && !isSignedIn) {
+      router.push('/login?redirect=/projects')
+      return
+    }
     if (isLoaded && isSignedIn) {
-      const timer = setTimeout(() => {
-        loadProjects()
-      }, 100)
-      return () => clearTimeout(timer)
+      loadProjects()
     }
   }, [isLoaded, isSignedIn])
 

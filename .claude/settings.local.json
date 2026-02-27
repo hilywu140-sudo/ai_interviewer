@@ -39,7 +39,10 @@
       "Bash(npm uninstall @clerk/nextjs @clerk/localizations)",
       "Bash(PGPASSWORD=195101 psql:*)",
       "WebFetch(domain:docs.litellm.ai)",
-      "WebFetch(domain:www.promptfoo.dev)"
+      "WebFetch(domain:www.promptfoo.dev)",
+      "WebFetch(domain:github.com)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     langsmith_project: str = "ai-interview-coach"
     langsmith_tracing: bool = True  # 是否启用追踪
 
+    # Tavily Search
+    tavily_api_key: Optional[str] = None
+
     # Aliyun ASR
     aliyun_access_key_id: str
     aliyun_access_key_secret: str
@@ -50,10 +53,6 @@ class Settings(BaseSettings):
     # 阿里云邮件推送
     aliyun_dm_account_name: Optional[str] = None  # 发信地址
     aliyun_dm_from_alias: Optional[str] = None  # 发信人昵称
-
-    # Supabase 认证
-    supabase_url: Optional[str] = None
-    supabase_jwt_secret: Optional[str] = None
 
     @property
     def cors_origins_list(self) -> List[str]:
