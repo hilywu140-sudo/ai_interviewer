@@ -77,7 +77,7 @@ else
         . /etc/os-release
         if [[ "$ID" == "centos" || "$ID" == "alinux" || "$ID" == "rhel" || "$ID" == "aliyun" ]]; then
             yum install -y yum-utils
-            yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+            yum-config-manager --add-repo https://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
             yum install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
         elif [[ "$ID" == "ubuntu" || "$ID" == "debian" ]]; then
             apt-get update
