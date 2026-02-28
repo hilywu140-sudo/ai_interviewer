@@ -42,7 +42,8 @@
       "WebFetch(domain:www.promptfoo.dev)",
       "WebFetch(domain:github.com)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

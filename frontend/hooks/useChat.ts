@@ -99,12 +99,18 @@ export function useChat(sessionId: string): UseChatReturn {
   const wsRef = useRef<WebSocket | null>(null)
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
   const streamingContentRef = useRef<string>('')  // 用于在回调中获取最新的流式内容
+  const feedbackStreamingContentRef = useRef<string>('')  // 用于在回调中获取最新的流式反馈内容
   const connectTimeoutRef = useRef<NodeJS.Timeout | null>(null)  // 防抖连接
 
   // 同步 streamingContent 到 ref
   useEffect(() => {
     streamingContentRef.current = streamingContent
   }, [streamingContent])
+
+  // 同步 feedbackStreamingContent 到 ref
+  useEffect(() => {
+    feedbackStreamingContentRef.current = feedbackStreamingContent
+  }, [feedbackStreamingContent])
 
   // 获取 session 信息以获取 projectId
   useEffect(() => {
@@ -328,14 +334,17 @@ export function useChat(sessionId: string): UseChatReturn {
         switch (message.type) {
           case 'assistant_message':
             setAgentStatus('idle')
-            setMessages((prev) => [...prev, {
-              id: generateMessageId(),
-              role: 'assistant',
-              content: message.content || '',
-              type: 'text',
-              assetId: message.asset_id,  // 支持关联 Asset
-              timestamp: message.timestamp
-            }])
+            // 跳过空内容消息，避免产生多余的空气泡
+            if (message.content?.trim()) {
+              setMessages((prev) => [...prev, {
+                id: generateMessageId(),
+                role: 'assistant',
+                content: message.content || '',
+                type: 'text',
+                assetId: message.asset_id,  // 支持关联 Asset
+                timestamp: message.timestamp
+              }])
+            }
             break
 
           // 流式消息处理
@@ -363,7 +372,7 @@ export function useChat(sessionId: string): UseChatReturn {
             const streamEndMsg: ChatMessage = {
               id: streamEndMsgId,
               role: 'assistant',
-              content: message.full_content || streamingContent,
+              content: message.full_content || streamingContentRef.current,
               type: 'text',
               assetId: message.asset_id,  // 关联保存的 Asset
               timestamp: message.timestamp
@@ -475,7 +484,7 @@ export function useChat(sessionId: string): UseChatReturn {
             const feedbackStreamEndMsg: ChatMessage = {
               id: generateMessageId(),
               role: 'assistant',
-              content: message.full_content || feedbackStreamingContent || '分析完成',
+              content: message.full_content || feedbackStreamingContentRef.current || '分析完成',
               type: 'feedback',
               feedback: message.feedback,
               assetId: message.asset_id,
@@ -546,8 +555,8 @@ export function useChat(sessionId: string): UseChatReturn {
 
           default:
             console.warn('Unknown message type:', message.type, message)
-            // 如果有 content，仍然显示
-            if (message.content) {
+            // 只有非空 content 才创建气泡，避免状态消息产生多余气泡
+            if (message.content && message.content.trim()) {
               setMessages((prev) => [...prev, {
                 id: generateMessageId(),
                 role: 'assistant',

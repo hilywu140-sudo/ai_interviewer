@@ -148,15 +148,18 @@ async def handle_stream_response(
             db.commit()
             logger.info(f"已保存取消的消息: {len(full_content)} 字符")
 
-        await websocket.send_json({
-            "type": "generation_cancelled",
-            "partial_content": full_content,
-            "agent_status": {
-                "current_agent": None,
-                "status": "idle"
-            },
-            "timestamp": datetime.now().isoformat()
-        })
+        try:
+            await websocket.send_json({
+                "type": "generation_cancelled",
+                "partial_content": full_content,
+                "agent_status": {
+                    "current_agent": None,
+                    "status": "idle"
+                },
+                "timestamp": datetime.now().isoformat()
+            })
+        except Exception:
+            pass  # WebSocket 可能已关闭（如 disconnect 触发的 cancel）
         # 结束 run_tree（CancelledError 情况）
         if run_tree:
             try:
@@ -796,16 +799,14 @@ async def websocket_endpoint(
     except WebSocketDisconnect:
         manager.disconnect(websocket, session_id)
         unregister_callback(session_id)  # 清理回调
-        # 清理取消标志
-        if session_id in cancel_flags:
-            del cancel_flags[session_id]
-        # 取消并清理正在执行的任务
-        if session_id in processing_tasks:
-            task = processing_tasks[session_id]
-            if not task.done():
-                task.cancel()
-            del processing_tasks[session_id]
-        # 注意：不清理 ContextManager，因为用户可能重新连接
+        # 只取消当前连接自己的局部任务，不操作全局 cancel_flags 和 processing_tasks
+        # 避免在 React Strict Mode 等场景下，旧连接断开时误取消新连接的任务
+        if current_processing_task and not current_processing_task.done():
+            current_processing_task.cancel()
+            try:
+                await current_processing_task
+            except (asyncio.CancelledError, Exception):
+                pass
         logger.info(f"客户端断开连接: {session_id}")
     except Exception as e:
         logger.error(f"WebSocket错误: {e}")
