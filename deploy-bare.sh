@@ -344,14 +344,26 @@ step "Step 9/9: 配置 Nginx + HTTPS"
 systemctl stop ai-interviewer.service 2>/dev/null || true
 systemctl disable ai-interviewer.service 2>/dev/null || true
 
-# 自动检测 nginx 配置目录
+# 宝塔面板特殊处理：设置正确的 nginx 配置路径
 if [ -d "/www/server/nginx/conf" ]; then
     NGINX_CONF_DIR="/www/server/nginx/conf"
+    NGINX_MAIN_CONF="/www/server/nginx/conf/nginx.conf"
+    NGINX_BIN="/www/server/nginx/sbin/nginx"
+    # 创建符号链接，让 certbot 能找到正确的 nginx 配置
+    if [ ! -f /etc/nginx/nginx.conf ] && [ -f "$NGINX_MAIN_CONF" ]; then
+        mkdir -p /etc/nginx
+        ln -sf "$NGINX_MAIN_CONF" /etc/nginx/nginx.conf
+        info "已创建 nginx.conf 符号链接到 /etc/nginx/"
+    fi
     info "检测到宝塔面板 Nginx: $NGINX_CONF_DIR"
 elif [ -d "/etc/nginx/conf.d" ]; then
     NGINX_CONF_DIR="/etc/nginx/conf.d"
+    NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
+    NGINX_BIN="nginx"
 else
     NGINX_CONF_DIR="/etc/nginx/conf.d"
+    NGINX_MAIN_CONF="/etc/nginx/nginx.conf"
+    NGINX_BIN="nginx"
     mkdir -p "$NGINX_CONF_DIR"
 fi
 
@@ -433,8 +445,12 @@ fi
 # 创建 certbot webroot 目录
 mkdir -p /var/www/certbot
 
-# 测试并重启 nginx
-nginx -t && systemctl restart nginx
+# 测试并重启 nginx（宝塔面板使用 btctl 或直接调用 nginx 二进制）
+if [ -x "$NGINX_BIN" ]; then
+    $NGINX_BIN -t && systemctl restart nginx
+else
+    nginx -t && systemctl restart nginx
+fi
 info "Nginx HTTP 配置完成"
 
 # 申请 SSL 证书
@@ -446,7 +462,12 @@ if [ "$SKIP_SSL" = false ]; then
 
     if command -v certbot &> /dev/null; then
         info "申请 Let's Encrypt 证书..."
-        certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive --redirect
+        # 宝塔面板：使用 -c 指定 nginx 配置路径
+        if [ -f "$NGINX_MAIN_CONF" ]; then
+            certbot --nginx -c "$NGINX_MAIN_CONF" -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive --redirect
+        else
+            certbot --nginx -d "$DOMAIN" --email "$EMAIL" --agree-tos --non-interactive --redirect
+        fi
 
         if [ $? -eq 0 ]; then
             info "SSL 证书申请成功，HTTPS 已启用"
@@ -454,7 +475,11 @@ if [ "$SKIP_SSL" = false ]; then
             # 手动添加 WebSocket 长连接超时到 HTTPS server block
             # certbot 会自动添加 HTTPS redirect 和 SSL 配置
             # 我们只需确保 ws location 有正确的超时设置
-            nginx -t && systemctl reload nginx
+            if [ -x "$NGINX_BIN" ]; then
+                $NGINX_BIN -t && systemctl reload nginx
+            else
+                nginx -t && systemctl reload nginx
+            fi
         else
             warn "SSL 证书申请失败，网站仍可通过 HTTP 访问"
         fi
