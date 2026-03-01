@@ -344,8 +344,19 @@ step "Step 9/9: 配置 Nginx + HTTPS"
 systemctl stop ai-interviewer.service 2>/dev/null || true
 systemctl disable ai-interviewer.service 2>/dev/null || true
 
+# 自动检测 nginx 配置目录
+if [ -d "/www/server/nginx/conf" ]; then
+    NGINX_CONF_DIR="/www/server/nginx/conf"
+    info "检测到宝塔面板 Nginx: $NGINX_CONF_DIR"
+elif [ -d "/etc/nginx/conf.d" ]; then
+    NGINX_CONF_DIR="/etc/nginx/conf.d"
+else
+    NGINX_CONF_DIR="/etc/nginx/conf.d"
+    mkdir -p "$NGINX_CONF_DIR"
+fi
+
 # 写 Nginx 配置（先 HTTP）
-cat > /etc/nginx/conf.d/ai-interviewer.conf <<'NGINX_EOF'
+cat > "$NGINX_CONF_DIR/ai-interviewer.conf" <<'NGINX_EOF'
 upstream frontend {
     server 127.0.0.1:3000;
 }
@@ -404,12 +415,20 @@ server {
 NGINX_EOF
 
 # 替换域名
-sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" /etc/nginx/conf.d/ai-interviewer.conf
+sed -i "s/DOMAIN_PLACEHOLDER/$DOMAIN/g" "$NGINX_CONF_DIR/ai-interviewer.conf"
 
 # 删除默认配置（避免冲突）
-rm -f /etc/nginx/conf.d/default.conf
-# 确保主配置不监听 80
-sed -i '/listen.*80/d' /etc/nginx/nginx.conf 2>/dev/null || true
+rm -f "$NGINX_CONF_DIR/default.conf" 2>/dev/null || true
+
+# 如果是宝塔面板，确保主配置 include 了我们的配置
+if [[ "$NGINX_CONF_DIR" == "/www/server/nginx/conf" ]]; then
+    NGINX_MAIN_CONF="/www/server/nginx/conf/nginx.conf"
+    if ! grep -q "ai-interviewer.conf" "$NGINX_MAIN_CONF"; then
+        # 在 http { } 块最后一个 } 之前插入 include
+        sed -i '/^}/i\    include '"$NGINX_CONF_DIR"'/ai-interviewer.conf;' "$NGINX_MAIN_CONF"
+        info "已将 ai-interviewer.conf 加入 nginx 主配置"
+    fi
+fi
 
 # 创建 certbot webroot 目录
 mkdir -p /var/www/certbot
